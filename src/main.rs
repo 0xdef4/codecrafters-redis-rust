@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use std::{io::{BufReader, Write}, net::{TcpListener, TcpStream}};
+use std::{io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream}};
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -24,9 +24,28 @@ fn main() {
 }
 
 fn handle_connection(stream: &mut TcpStream) {
-    loop {
-        let mut reader = BufReader::new(&mut *stream);
+    // loop {
+    //     let reader = BufReader::new(&mut *stream);
 
-        stream.write_all(b"+PONG\r\n").unwrap();
+    //     for _ in reader.lines() {
+    //         stream.write_all(b"+PONG\r\n").unwrap();
+    //     }
+
+    // }
+
+
+
+
+    let mut reader = BufReader::new(&mut *stream);
+    loop {
+        let mut buffer = [0; 512];
+        match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(_) => {
+                reader.get_mut().write_all(b"+PONG\r\n").unwrap();
+            }
+            Err(_) => break,
+        }
     }
+    
 }
