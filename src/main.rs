@@ -5,8 +5,6 @@ fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
-    // Uncomment the code below to pass the first stage
-    
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
     
     for stream in listener.incoming() {
@@ -29,29 +27,11 @@ fn handle_connection(stream: &mut TcpStream) {
 
         let mut buffer = [0; 512];
         match reader.read(&mut buffer) {
+            Ok(0) => break,
             Ok(_) => {
                 reader.get_mut().write_all(b"+PONG\r\n").unwrap();
             },
-            Err(_) => {
-                break
-            }
+            Err(_) => break
         }
     }
-
-
-
-    // TODO : 다시 설명 읽기 특히 .read() 부분
-
-    // let mut reader = BufReader::new(&mut *stream);
-    // loop {
-    //     let mut buffer = [0; 512];
-    //     match reader.read(&mut buffer) {
-    //         Ok(0) => break,
-    //         Ok(_) => {
-    //             reader.get_mut().write_all(b"+PONG\r\n").unwrap();
-    //         }
-    //         Err(_) => break,
-    //     }
-    // }
-    
 }
