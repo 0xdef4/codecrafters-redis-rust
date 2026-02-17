@@ -24,28 +24,34 @@ fn main() {
 }
 
 fn handle_connection(stream: &mut TcpStream) {
-    // loop {
-    //     let reader = BufReader::new(&mut *stream);
-
-    //     for _ in reader.lines() {
-    //         stream.write_all(b"+PONG\r\n").unwrap();
-    //     }
-
-    // }
-
-
-
-
-    let mut reader = BufReader::new(&mut *stream);
     loop {
+        let mut reader = BufReader::new(&mut *stream);
+
         let mut buffer = [0; 512];
         match reader.read(&mut buffer) {
-            Ok(0) => break,
             Ok(_) => {
                 reader.get_mut().write_all(b"+PONG\r\n").unwrap();
+            },
+            Err(_) => {
+                break
             }
-            Err(_) => break,
         }
     }
+
+
+
+    // TODO : 다시 설명 읽기 특히 .read() 부분
+
+    // let mut reader = BufReader::new(&mut *stream);
+    // loop {
+    //     let mut buffer = [0; 512];
+    //     match reader.read(&mut buffer) {
+    //         Ok(0) => break,
+    //         Ok(_) => {
+    //             reader.get_mut().write_all(b"+PONG\r\n").unwrap();
+    //         }
+    //         Err(_) => break,
+    //     }
+    // }
     
 }
