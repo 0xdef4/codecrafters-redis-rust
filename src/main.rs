@@ -8,8 +8,8 @@ async fn main() {
 
     loop {
         match listener.accept().await {
-            Ok((stream, addr)) => {
-                println!("socket addr: {:?}", addr);
+            Ok((stream, _addr)) => {
+                // println!("socket addr: {:?}", addr);
 
                 tokio::spawn(async move {
                     handle_stream(stream).await;
@@ -21,52 +21,20 @@ async fn main() {
 }
 
 async fn handle_stream(stream: TcpStream) {
-    let mut buffer = [0; 512];
+    // let mut buffer = [0; 512];
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
 
+    let mut buf = String::new();
+    
     loop {
-        match rd.read(&mut buffer).await {
-            Ok(0) => break,
-            Ok(_) => {
-                let _ = wr.write_all(b"+PONG\r\n").await;
-            }
-            Err(_) => break,
+        match rd.read_line(&mut buf).await {
+                Ok(0) => break,
+                Ok(_) => {
+                    println!("buf: {}", buf);
+                    let _ = wr.write_all(b"+PONG\r\n").await;
+                }
+                Err(_) => break,
         }
     }
 }
-
-/*
-use tokio::net::TcpListener;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-#[tokio::main]
-async fn main() {
-    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
-
-    loop {
-        let stream = listener.accept().await;
-
-        match stream {
-            Ok((mut stream, _)) => {
-                println!("accepted new connection");
-
-                tokio::spawn(async move {
-                    let mut buf = [0; 512];
-                    loop {
-                        let read_count = stream.read(&mut buf).await.unwrap();
-                        if read_count == 0 {
-                            break;
-                        }
-
-                        stream.write(b"+PONG\r\n").await.unwrap();
-                    }
-                });
-            }
-            Err(e) => {
-                println!("error: {}", e);
-            }
-        }
-    }
-}
-*/
