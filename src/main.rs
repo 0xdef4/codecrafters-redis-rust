@@ -31,7 +31,8 @@ async fn handle_stream(stream: TcpStream) {
         match rd.read_line(&mut buf).await {
                 Ok(0) => break,
                 Ok(_) => {
-                    println!("buf: {}", buf);
+                    println!("buf: {:?}", buf);
+                    buf.clear();
                     let _ = wr.write_all(b"+PONG\r\n").await;
                 }
                 Err(_) => break,
