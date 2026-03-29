@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, AsyncBufReadExt};
 use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
@@ -22,9 +22,9 @@ async fn main() {
 
 async fn handle_stream(stream: TcpStream) {
     let mut buffer = [0; 512];
-    let (mut rd, mut wr) = stream.into_split();
-    // let mut rd = BufReader::new(rd);
-    
+    let (rd, mut wr) = stream.into_split();
+    let mut rd = BufReader::new(rd);
+
     loop {
         match rd.read(&mut buffer).await {
             Ok(0) => break,
