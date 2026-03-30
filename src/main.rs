@@ -30,10 +30,21 @@ async fn handle_stream(stream: TcpStream) {
         match rd.read_to_string(&mut buf).await {
                 Ok(0) => break,
                 Ok(_) => {
-                    println!("buf: {:?}", buf);
+                    // println!("buf: {:?}", buf);
 
-                    // buf.clear();
-                    let _ = wr.write_all(b"+PONG\r\n").await;
+                    let resp_array = decode_arrays(&buf);
+
+                    match resp_array.as_slice() {
+                        [cmd] if cmd.to_uppercase() == "PING" => {
+                            let _ = wr.write_all(b"+PONG\r\n").await;
+                        },
+                        [cmd, arg] if cmd.to_uppercase() == "ECHO" => {
+                            let response = encode_bulk_strings(arg.clone());
+                            let _ = wr.write_all(response.as_bytes()).await;
+                        }
+                        _ => todo!()
+                    }
+
                 }
                 Err(_) => break,
         }
@@ -107,7 +118,7 @@ fn encode_arrays(arr: &[&str]) -> String {
 }
 
 /// RESP decode arrays'
-fn decode_arrays(input: &str) -> Vec<&str> {
+fn decode_arrays(input: &str) -> Vec<String> {
     let mut output = Vec::new();
     
     // TODO: *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n     ->     ["ECHO", "hey"]
@@ -123,7 +134,7 @@ fn decode_arrays(input: &str) -> Vec<&str> {
 
     for el in v2 {
         let element = el.split_ascii_whitespace().nth(1).unwrap();
-        output.push(element);
+        output.push(element.to_string());
     }
 
     output
