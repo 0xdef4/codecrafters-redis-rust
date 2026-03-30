@@ -35,6 +35,8 @@ async fn handle_stream(stream: TcpStream) {
 
                 let resp_array = decode_arrays(&received);
 
+                println!("resp_array: {:?}", resp_array);
+
                 match resp_array.as_slice() {
                     [cmd] if cmd.to_uppercase() == "PING".to_string() => {
                         let _ = wr.write_all(b"+PONG\r\n").await;
@@ -43,7 +45,7 @@ async fn handle_stream(stream: TcpStream) {
                         let response = encode_bulk_strings(arg.clone());
                         let _ = wr.write_all(response.as_bytes()).await;
                     }
-                    _ => todo!(),
+                    _ => unreachable!(),
                 }
             }
             Err(_) => break,
