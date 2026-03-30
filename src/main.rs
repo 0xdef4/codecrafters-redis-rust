@@ -35,10 +35,10 @@ async fn handle_stream(stream: TcpStream) {
                     let resp_array = decode_arrays(&buf);
 
                     match resp_array.as_slice() {
-                        [cmd] if cmd.to_uppercase() == "PING" => {
+                        [cmd] if cmd.to_uppercase() == "PING".to_string() => {
                             let _ = wr.write_all(b"+PONG\r\n").await;
                         },
-                        [cmd, arg] if cmd.to_uppercase() == "ECHO" => {
+                        [cmd, arg] if cmd.to_uppercase() == "ECHO".to_string() => {
                             let response = encode_bulk_strings(arg.clone());
                             let _ = wr.write_all(response.as_bytes()).await;
                         }
@@ -121,8 +121,7 @@ fn encode_arrays(arr: &[&str]) -> String {
 fn decode_arrays(input: &str) -> Vec<String> {
     let mut output = Vec::new();
     
-    // TODO: *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n     ->     ["ECHO", "hey"]
-    
+    // Objective : *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n     ->     ["ECHO", "hey"]
     let index_end_of_array_length = input.find(' ').unwrap();
     let (arr_len, elements)= input.split_at(index_end_of_array_length);
 
