@@ -30,7 +30,7 @@ async fn handle_stream(stream: TcpStream) {
         match rd.read_to_string(&mut buf).await {
                 Ok(0) => break,
                 Ok(_) => {
-                    // println!("buf: {:?}", buf);
+                    println!("buf: {:?}", buf);
 
                     let resp_array = decode_arrays(&buf);
 
