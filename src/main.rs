@@ -11,6 +11,15 @@ struct MapValue {
     expires_at: Option<Instant>
 }
 
+impl MapValue {
+    fn new(value: String, expires_at: Option<Instant>) -> Self {
+        Self {
+            value,
+            expires_at
+        }
+    }
+}
+
 type Db = Arc<Mutex<HashMap<String, MapValue>>>;
 
 #[tokio::main]
@@ -62,7 +71,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                     [cmd, arg1, arg2, rest @ ..] if cmd.to_uppercase() == "SET".to_string() => {
                         match rest {
                             [] => {
-                                let value = MapValue {value: arg2.to_string(), expires_at : None};
+                                let value = MapValue::new(arg2.to_string(), None);
                                 {
                                     let mut db = db.lock().unwrap();
                                     db.insert(arg1.to_string(), value);
@@ -73,7 +82,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                 let now = Instant::now();
                                 let expires_at = now + Duration::from_secs(seconds.parse().unwrap());
 
-                                let value = MapValue {value: arg2.to_string(), expires_at: Some(expires_at)};
+                                let value = MapValue::new(arg2.to_string(), Some(expires_at));
                                 {
                                     let mut db = db.lock().unwrap();
                                     db.insert(arg1.to_string(), value);
@@ -84,7 +93,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                 let now = Instant::now();
                                 let expires_at = now + Duration::from_millis(milliseconds.parse().unwrap());
 
-                                let value = MapValue {value: arg2.to_string(), expires_at: Some(expires_at)};
+                                let value = MapValue::new(arg2.to_string(), Some(expires_at));
                                 {
                                     let mut db = db.lock().unwrap();
                                     db.insert(arg1.to_string(), value);
