@@ -4,8 +4,14 @@ use tokio::net::{TcpListener, TcpStream};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::{Instant, Duration};
 
-type Db = Arc<Mutex<HashMap<String, String>>>;
+struct MapValue {
+    value: String,
+    expires_at: Option<Instant>
+}
+
+type Db = Arc<Mutex<HashMap<String, MapValue>>>;
 
 #[tokio::main]
 async fn main() {
@@ -53,19 +59,58 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                     [cmd, arg] if cmd.to_uppercase() == "ECHO".to_string() => {
                         let _ = wr.write_all(encode_bulk_strings(arg.clone()).as_bytes()).await;
                     }
-                    [cmd, arg1, arg2] if cmd.to_uppercase() == "SET".to_string() => {
-                        {
-                            let mut db = db.lock().unwrap();
-                            db.insert(arg1.to_string(), arg2.to_string());
+                    [cmd, arg1, arg2, rest @ ..] if cmd.to_uppercase() == "SET".to_string() => {
+                        match rest {
+                            [] => {
+                                let value = MapValue {value: arg2.to_string(), expires_at : None};
+                                {
+                                    let mut db = db.lock().unwrap();
+                                    db.insert(arg1.to_string(), value);
+                                }
+                                let _ = wr.write_all(encode_simple_strings("OK".to_string()).as_bytes()).await;
+                            },
+                            [option, seconds] if option.to_uppercase() == "EX" => {
+                                let now = Instant::now();
+                                let expires_at = now + Duration::from_secs(seconds.parse().unwrap());
+
+                                let value = MapValue {value: arg2.to_string(), expires_at: Some(expires_at)};
+                                {
+                                    let mut db = db.lock().unwrap();
+                                    db.insert(arg1.to_string(), value);
+                                }
+                                let _ = wr.write_all(encode_simple_strings("OK".to_string()).as_bytes()).await;
+                            },
+                            [option, milliseconds] if option.to_uppercase() == "PX" => {
+                                let now = Instant::now();
+                                let expires_at = now + Duration::from_millis(milliseconds.parse().unwrap());
+
+                                let value = MapValue {value: arg2.to_string(), expires_at: Some(expires_at)};
+                                {
+                                    let mut db = db.lock().unwrap();
+                                    db.insert(arg1.to_string(), value);
+                                }
+                                let _ = wr.write_all(encode_simple_strings("OK".to_string()).as_bytes()).await;
+                            }
+                            _=> unreachable!()
                         }
-                        let _ = wr.write_all(encode_simple_strings("OK".to_string()).as_bytes()).await;
                     }
                     [cmd, arg] if cmd.to_uppercase() == "GET".to_string() => {
                         let response = {
                             let db = db.lock().unwrap();
                             
                             if let Some(value) = db.get(arg) {
-                                encode_bulk_strings(value.clone())
+                                match value.expires_at {
+                                    Some(instant) => {
+                                        if Instant::now() > instant {
+                                            encode_bulk_strings("".to_string())
+                                        } else {
+                                            encode_bulk_strings(value.value.clone())
+                                        }
+                                    }
+                                    None => {
+                                        encode_bulk_strings(value.value.clone())
+                                    }
+                                }
                             } else {
                                 encode_bulk_strings("".to_string())
                             }
