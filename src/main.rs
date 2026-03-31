@@ -120,9 +120,21 @@ fn encode_arrays(arr: &[&str]) -> String {
 }
 
 /// RESP decode arrays'
+/// 
+/// # Examples
+///
+/// So the the following,
+///
+/// ```text
+/// *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n
+/// ```
+/// 
+/// is decoded to,
+/// 
+/// ```text
+/// ["ECHO", "hey"]
+/// ```
 fn decode_arrays(input: &str) -> Vec<String> {
-    // Objective : *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n     ->     ["ECHO", "hey"]
-
     input.split("\r\n").filter(|e| !e.is_empty())
     .filter(|e| !e.starts_with('*'))
     .filter(|e| !e.starts_with('$'))
