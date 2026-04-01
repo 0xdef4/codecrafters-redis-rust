@@ -1,12 +1,13 @@
-
-/// Simple strings 
-/// 
+/// RESP encode simple strings
+///
 /// Simple strings are encoded as a plus (+) character, followed by a string. The string mustn't contain a CR (\r) or LF (\n) character and is terminated by CRLF (i.e., \r\n).
-/// Simple strings transmit short, non-binary strings with minimal overhead. For example, many Redis commands reply with just "OK" on success. 
+/// Simple strings transmit short, non-binary strings with minimal overhead. For example, many Redis commands reply with just "OK" on success.
 /// The encoding of this Simple String is the following 5 bytes:
+///
 /// ```text
 /// +OK\r\n
 /// ```
+///
 /// When Redis replies with a simple string, a client library should return to the caller a string value composed of the first character after the + up to the end of the string, excluding the final CRLF bytes.
 /// To send binary strings, use bulk strings instead.
 pub fn encode_simple_strings(input: String) -> String {
@@ -15,7 +16,29 @@ pub fn encode_simple_strings(input: String) -> String {
 
 /// RESP decode simple strings
 pub fn decode_simple_strings(input: String) -> String {
-    input.trim_end_matches("\r\n").trim_start_matches("+").to_string()
+    input
+        .trim_end_matches("\r\n")
+        .trim_start_matches("+")
+        .to_string()
+}
+
+/// RESP encode integers
+/// This type is a CRLF-terminated string that represents a signed, base-10, 64-bit integer.
+
+/// RESP encodes integers in the following way:
+///
+/// ```text
+/// :[<+|->]<value>\r\n
+/// ```
+///
+/// For example, :0\r\n and :1000\r\n are integer replies (of zero and one thousand, respectively).
+pub fn encode_integers(input: i64) -> String {
+    format!(":{}\r\n", input)
+}
+
+/// RESP decode integers
+pub fn decode_integers(input: String) -> i64 {
+    todo!()
 }
 
 /// RESP encode bulk strings
@@ -89,7 +112,7 @@ pub fn encode_arrays(arr: &[&str]) -> String {
 }
 
 /// RESP decode arrays'
-/// 
+///
 /// # Examples
 ///
 /// So the the following,
@@ -97,16 +120,18 @@ pub fn encode_arrays(arr: &[&str]) -> String {
 /// ```text
 /// *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n
 /// ```
-/// 
+///
 /// is decoded to,
-/// 
+///
 /// ```text
 /// ["ECHO", "hey"]
 /// ```
 pub fn decode_arrays(input: &str) -> Vec<String> {
-    input.split("\r\n").filter(|e| !e.is_empty())
-    .filter(|e| !e.starts_with('*'))
-    .filter(|e| !e.starts_with('$'))
-    .map(|e| e.to_string())
-    .collect::<Vec<_>>()
+    input
+        .split("\r\n")
+        .filter(|e| !e.is_empty())
+        .filter(|e| !e.starts_with('*'))
+        .filter(|e| !e.starts_with('$'))
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
 }

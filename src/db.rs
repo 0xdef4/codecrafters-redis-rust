@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
-pub type Db = Arc<Mutex<HashMap<String, MapValue>>>;
+pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
 
-pub struct MapValue {
-    pub value: String,
-    pub expires_at: Option<Instant>
+pub enum ValueType {
+    String(String),
+    List(Vec<String>),
 }
 
-impl MapValue {
-    pub fn new(value: String, expires_at: Option<Instant>) -> Self {
-        Self {
-            value,
-            expires_at
-        }
+pub struct RedisValue {
+    pub value: ValueType,
+    pub expires_at: Option<Instant>,
+}
+
+impl RedisValue {
+    pub fn new(value: ValueType, expires_at: Option<Instant>) -> Self {
+        Self { value, expires_at }
     }
 }
-
