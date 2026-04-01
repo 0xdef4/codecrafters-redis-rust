@@ -61,14 +61,14 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             .write_all(encode_bulk_strings(arg.clone()).as_bytes())
                             .await;
                     }
-                    [cmd, arg1, arg2, rest @ ..] if cmd.to_uppercase() == "SET".to_string() => {
+                    [cmd, key, value, rest @ ..] if cmd.to_uppercase() == "SET".to_string() => {
                         match rest {
                             [] => {
                                 let redis_value =
-                                    RedisValue::new(ValueType::String(arg2.to_string()), None);
+                                    RedisValue::new(ValueType::String(value.to_string()), None);
                                 {
                                     let mut db = db.lock().unwrap();
-                                    db.insert(arg1.to_string(), redis_value);
+                                    db.insert(key.to_string(), redis_value);
                                 }
                                 let _ = wr
                                     .write_all(encode_simple_strings("OK".to_string()).as_bytes())
@@ -80,12 +80,12 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                     now + Duration::from_secs(seconds.parse().unwrap());
 
                                 let redis_value = RedisValue::new(
-                                    ValueType::String(arg2.to_string()),
+                                    ValueType::String(value.to_string()),
                                     Some(expires_at),
                                 );
                                 {
                                     let mut db = db.lock().unwrap();
-                                    db.insert(arg1.to_string(), redis_value);
+                                    db.insert(key.to_string(), redis_value);
                                 }
                                 let _ = wr
                                     .write_all(encode_simple_strings("OK".to_string()).as_bytes())
@@ -97,12 +97,12 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                     now + Duration::from_millis(milliseconds.parse().unwrap());
 
                                 let redis_value = RedisValue::new(
-                                    ValueType::String(arg2.to_string()),
+                                    ValueType::String(value.to_string()),
                                     Some(expires_at),
                                 );
                                 {
                                     let mut db = db.lock().unwrap();
-                                    db.insert(arg1.to_string(), redis_value);
+                                    db.insert(key.to_string(), redis_value);
                                 }
                                 let _ = wr
                                     .write_all(encode_simple_strings("OK".to_string()).as_bytes())
@@ -111,11 +111,11 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             _ => unreachable!(),
                         }
                     }
-                    [cmd, arg] if cmd.to_uppercase() == "GET".to_string() => {
+                    [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
                         let response = {
                             let db = db.lock().unwrap();
 
-                            if let Some(redis_value) = db.get(arg) {
+                            if let Some(redis_value) = db.get(key) {
                                 match redis_value.expires_at {
                                     Some(instant) => {
                                         if Instant::now() > instant {
@@ -143,13 +143,17 @@ async fn handle_stream(stream: TcpStream, db: Db) {
 
                         let _ = wr.write_all(response.as_bytes()).await;
                     }
-                    [cmd, arg1, arg2] if cmd.to_uppercase() == "RPUSH".to_string() => {
+                    [cmd, list_key, list_values @ ..]
+                        if cmd.to_uppercase() == "RPUSH".to_string() =>
+                    {
                         let list_length = {
                             let mut db = db.lock().unwrap();
 
-                            if let Some(redis_value) = db.get_mut(arg1) {
+                            if let Some(redis_value) = db.get_mut(list_key) {
                                 if let ValueType::List(list) = &mut redis_value.value {
-                                    list.push(arg2.to_string());
+                                    for el in list_values {
+                                        list.push(el.to_string());
+                                    }
 
                                     list.len()
                                 } else {
@@ -157,12 +161,15 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                 }
                             } else {
                                 let mut list = Vec::new();
-                                list.push(arg2.to_string());
+                                for el in list_values {
+                                    list.push(el.to_string());
+                                }
+
                                 let len = list.len();
 
                                 let redis_value = RedisValue::new(ValueType::List(list), None);
 
-                                db.insert(arg1.to_string(), redis_value);
+                                db.insert(list_key.to_string(), redis_value);
 
                                 len
                             }
