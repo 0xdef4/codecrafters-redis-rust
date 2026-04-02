@@ -227,6 +227,42 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                         let refs: Vec<&str> = slice.iter().map(|s| s.as_str()).collect();
                         let _ = wr.write_all(encode_arrays(&refs).as_bytes()).await;
                     }
+                    // TODO: ongoing
+                    [cmd, list_key, list_values @ ..]
+                        if cmd.to_uppercase() == "LPUSH".to_string() =>
+                    {
+                        let list_length = {
+                            let mut db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get_mut(list_key) {
+                                if let ValueType::List(list) = &mut redis_value.value {
+                                    for el in list_values {
+                                        list.insert(0, el.to_string());
+                                    }
+
+                                    list.len()
+                                } else {
+                                    unimplemented!()
+                                }
+                            } else {
+                                let mut list = Vec::new();
+                                for el in list_values {
+                                    list.insert(0, el.to_string());
+                                }
+
+                                let len = list.len();
+
+                                let redis_value = RedisValue::new(ValueType::List(list), None);
+
+                                db.insert(list_key.to_string(), redis_value);
+
+                                len
+                            }
+                        };
+                        let _ = wr
+                            .write_all(encode_integers(list_length as i64).as_bytes())
+                            .await;
+                    }
                     _ => unreachable!(),
                 }
             }
