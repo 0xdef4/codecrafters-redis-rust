@@ -198,7 +198,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                         start_index as usize
                                     };
 
-                                    let mut stop = if stop_index < 0 && start_index.abs() > list_length  as i64 {
+                                    let mut stop = if stop_index < 0 && stop_index.abs() > list_length  as i64 {
                                         0
                                     } else if stop_index < 0 {
                                         (list_length as i64 + stop_index).max(0) as usize
