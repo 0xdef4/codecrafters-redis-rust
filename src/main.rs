@@ -174,10 +174,40 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                 len
                             }
                         };
-
                         let _ = wr
                             .write_all(encode_integers(list_length as i64).as_bytes())
                             .await;
+                    }
+                    [cmd, list_key, start_index, stop_index]
+                        if cmd.to_uppercase() == "LRANGE".to_string() =>
+                    {
+                        let slice = {
+                            let db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get(list_key) {
+                                if let ValueType::List(list) = &redis_value.value {
+                                    let list_length = list.len();
+                                    let start_index = start_index.parse().unwrap();
+                                    let mut stop_index = stop_index.parse().unwrap();
+
+                                    if start_index >= list_length || start_index > stop_index {
+                                        Vec::new()
+                                    } else if stop_index >= list_length {
+                                        stop_index = list_length - 1;
+
+                                        list[start_index..=stop_index].to_vec()
+                                    } else {
+                                        list[start_index..=stop_index].to_vec()
+                                    }
+                                } else {
+                                    unimplemented!()
+                                }
+                            } else {
+                                Vec::new()
+                            }
+                        };
+                        let refs: Vec<&str> = slice.iter().map(|s| s.as_str()).collect();
+                        let _ = wr.write_all(encode_arrays(&refs).as_bytes()).await;
                     }
                     _ => unreachable!(),
                 }
