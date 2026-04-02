@@ -190,7 +190,9 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                     let start_index: i64 = start_index.parse().unwrap();
                                     let stop_index: i64 = stop_index.parse().unwrap();
 
-                                    let start = if start_index < 0 && start_index.abs() > list_length  as i64 {
+                                    let start = if start_index < 0
+                                        && start_index.abs() > list_length as i64
+                                    {
                                         0
                                     } else if start_index < 0 {
                                         (list_length as i64 + start_index).max(0) as usize
@@ -198,7 +200,9 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                         start_index as usize
                                     };
 
-                                    let mut stop = if stop_index < 0 && stop_index.abs() > list_length  as i64 {
+                                    let mut stop = if stop_index < 0
+                                        && stop_index.abs() > list_length as i64
+                                    {
                                         0
                                     } else if stop_index < 0 {
                                         (list_length as i64 + stop_index).max(0) as usize
@@ -227,7 +231,6 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                         let refs: Vec<&str> = slice.iter().map(|s| s.as_str()).collect();
                         let _ = wr.write_all(encode_arrays(&refs).as_bytes()).await;
                     }
-                    // TODO: ongoing
                     [cmd, list_key, list_values @ ..]
                         if cmd.to_uppercase() == "LPUSH".to_string() =>
                     {
@@ -262,6 +265,23 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                         let _ = wr
                             .write_all(encode_integers(list_length as i64).as_bytes())
                             .await;
+                    }
+                    [cmd, list_key] if cmd.to_uppercase() == "LLEN".to_string() => {
+                        let response = {
+                            let db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get(list_key) {
+                                match &redis_value.value {
+                                    ValueType::List(list) => {
+                                        list.len()
+                                    }
+                                    _ => 0
+                                }
+                            } else {
+                                0
+                            }
+                        };
+                        let _ = wr.write_all(encode_integers(response as i64).as_bytes()).await;
                     }
                     _ => unreachable!(),
                 }
