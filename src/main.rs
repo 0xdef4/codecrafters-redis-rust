@@ -61,8 +61,8 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             .write_all(encode_bulk_strings(arg.clone()).as_bytes())
                             .await;
                     }
-                    [cmd, key, value, rest @ ..] if cmd.to_uppercase() == "SET".to_string() => {
-                        match rest {
+                    [cmd, key, value, optional_args @ ..] if cmd.to_uppercase() == "SET".to_string() => {
+                        match optional_args {
                             [] => {
                                 let redis_value =
                                     RedisValue::new(ValueType::String(value.to_string()), None);
@@ -283,29 +283,53 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             .write_all(encode_integers(response as i64).as_bytes())
                             .await;
                     }
-                    [cmd, list_key] if cmd.to_uppercase() == "LPOP".to_string() => {
-                        let removed = {
-                            let mut db = db.lock().unwrap();
+                    [cmd, list_key, optional_args @ ..] if cmd.to_uppercase() == "LPOP".to_string() => {
+                        match optional_args {
+                            [] => {
+                                let removed = {
+                                    let mut db = db.lock().unwrap();
 
-                            if let Some(redis_value) = db.get_mut(list_key) {
-                                match &mut redis_value.value {
-                                    ValueType::List(list) => {
-                                        if list.len() == 0 {
-                                            "".to_string()
-                                        } else {
-                                            list.remove(0)}
+                                    if let Some(redis_value) = db.get_mut(list_key) {
+                                        match &mut redis_value.value {
+                                            ValueType::List(list) => {
+                                                if list.len() == 0 {
+                                                    "".to_string()
+                                                } else {
+                                                    list.remove(0)
+                                                }
+                                            }
+                                            _ => {
+                                                unimplemented!()
+                                            }
                                         }
-                                    _ => {
+                                    } else {
+                                        "".to_string()
+                                    }
+                                };
+                                let _ = wr.write_all(encode_bulk_strings(removed).as_bytes()).await;
+                            }
+                            [num_to_remove] => {
+                                let removed = {
+                                    let mut db = db.lock().unwrap();
+
+                                    if let Some(redis_value) = db.get_mut(list_key) {
+                                        match &mut redis_value.value {
+                                            ValueType::List(list) => {
+                                                list.split_off(num_to_remove.parse().unwrap())
+                                            }
+                                            _ => {
+                                                unimplemented!()
+                                            }
+                                        }
+                                    } else {
                                         unimplemented!()
                                     }
-                                }
-                            } else {
-                                "".to_string()
+                                };
+                                let refs: Vec<&str> = removed.iter().map(|s| s.as_str()).collect();
+                                let _ = wr.write_all(encode_arrays(&refs).as_bytes()).await;
                             }
-                        };
-                        let _ = wr
-                            .write_all(encode_bulk_strings(removed).as_bytes())
-                            .await;
+                            _ => unimplemented!(),
+                        }
                     }
                     _ => unreachable!(),
                 }
