@@ -272,16 +272,40 @@ async fn handle_stream(stream: TcpStream, db: Db) {
 
                             if let Some(redis_value) = db.get(list_key) {
                                 match &redis_value.value {
-                                    ValueType::List(list) => {
-                                        list.len()
-                                    }
-                                    _ => 0
+                                    ValueType::List(list) => list.len(),
+                                    _ => 0,
                                 }
                             } else {
                                 0
                             }
                         };
-                        let _ = wr.write_all(encode_integers(response as i64).as_bytes()).await;
+                        let _ = wr
+                            .write_all(encode_integers(response as i64).as_bytes())
+                            .await;
+                    }
+                    [cmd, list_key] if cmd.to_uppercase() == "LPOP".to_string() => {
+                        let removed = {
+                            let mut db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get_mut(list_key) {
+                                match &mut redis_value.value {
+                                    ValueType::List(list) => {
+                                        if list.len() == 0 {
+                                            "".to_string()
+                                        } else {
+                                            list.remove(0)}
+                                        }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                }
+                            } else {
+                                "".to_string()
+                            }
+                        };
+                        let _ = wr
+                            .write_all(encode_bulk_strings(removed).as_bytes())
+                            .await;
                     }
                     _ => unreachable!(),
                 }
