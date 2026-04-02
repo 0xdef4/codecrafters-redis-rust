@@ -206,6 +206,9 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                         stop_index as usize
                                     };
 
+                                    println!("start : {:?}", start);
+                                    println!("stop : {:?}", stop);
+
                                     if start >= list_length || start > stop {
                                         Vec::new()
                                     } else if stop >= list_length {
