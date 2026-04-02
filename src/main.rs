@@ -187,17 +187,32 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             if let Some(redis_value) = db.get(list_key) {
                                 if let ValueType::List(list) = &redis_value.value {
                                     let list_length = list.len();
-                                    let start_index = start_index.parse().unwrap();
-                                    let mut stop_index = stop_index.parse().unwrap();
+                                    let start_index: i64 = start_index.parse().unwrap();
+                                    let stop_index: i64 = stop_index.parse().unwrap();
 
-                                    if start_index >= list_length || start_index > stop_index {
-                                        Vec::new()
-                                    } else if stop_index >= list_length {
-                                        stop_index = list_length - 1;
-
-                                        list[start_index..=stop_index].to_vec()
+                                    let start = if start_index < 0 && start_index.abs() > list_length  as i64 {
+                                        0
+                                    } else if start_index < 0 {
+                                        (list_length as i64 + start_index).max(0) as usize
                                     } else {
-                                        list[start_index..=stop_index].to_vec()
+                                        start_index as usize
+                                    };
+
+                                    let mut stop = if stop_index < 0 && start_index.abs() > list_length  as i64 {
+                                        0
+                                    } else if stop_index < 0 {
+                                        (list_length as i64 + stop_index).max(0) as usize
+                                    } else {
+                                        stop_index as usize
+                                    };
+
+                                    if start >= list_length || start > stop {
+                                        Vec::new()
+                                    } else if stop >= list_length {
+                                        stop = list_length - 1;
+                                        list[start..=stop].to_vec()
+                                    } else {
+                                        list[start..=stop].to_vec()
                                     }
                                 } else {
                                     unimplemented!()
