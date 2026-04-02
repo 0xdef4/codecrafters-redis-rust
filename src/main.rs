@@ -315,7 +315,8 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                     if let Some(redis_value) = db.get_mut(list_key) {
                                         match &mut redis_value.value {
                                             ValueType::List(list) => {
-                                                list.split_off(num_to_remove.parse().unwrap())
+                                                list.split_off(num_to_remove.parse().unwrap());
+                                                list
                                             }
                                             _ => {
                                                 unimplemented!()
