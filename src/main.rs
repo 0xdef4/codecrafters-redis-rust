@@ -316,7 +316,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                         match &mut redis_value.value {
                                             ValueType::List(list) => {
                                                 list.split_off(num_to_remove.parse().unwrap());
-                                                list
+                                                list.to_vec()
                                             }
                                             _ => {
                                                 unimplemented!()
