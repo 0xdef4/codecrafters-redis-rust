@@ -153,6 +153,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         if cmd.to_uppercase() == "RPUSH".to_string() =>
                     {
                         let list_length = {
+                            // error here
                             let mut db = db.lock().unwrap();
 
                             if let Some(redis_value) = db.get_mut(list_key) {
@@ -351,6 +352,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             loop {
                                 // 1. 락 잡고 확인
                                 let has_value = {
+                                    // error here
                                     let mut db = db.lock().unwrap();
                                     // 리스트에 값 있는지 확인
                                     if let Some(redis_value) = db.get_mut(list_key) {
@@ -360,7 +362,9 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             unimplemented!()
                                         }
                                     } else {
-                                        unimplemented!()
+                                        // error here
+                                        // unimplemented!()
+                                        false
                                     }
                                 }; // 여기서 락 자동 해제
 
