@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Notify;
+use tokio::time::timeout;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -17,6 +19,7 @@ async fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
     let db = Arc::new(Mutex::new(HashMap::new()));
+    let notify = Arc::new(Notify::new());
 
     loop {
         match listener.accept().await {
@@ -24,9 +27,10 @@ async fn main() {
                 // println!("socket addr: {:?}", addr);
 
                 let db = Arc::clone(&db);
+                let notify = Arc::clone(&notify);
 
                 tokio::spawn(async move {
-                    handle_stream(stream, db).await;
+                    handle_stream(stream, db, notify).await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),
@@ -34,7 +38,7 @@ async fn main() {
     }
 }
 
-async fn handle_stream(stream: TcpStream, db: Db) {
+async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
 
@@ -61,7 +65,9 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             .write_all(encode_bulk_strings(arg.clone()).as_bytes())
                             .await;
                     }
-                    [cmd, key, value, optional_args @ ..] if cmd.to_uppercase() == "SET".to_string() => {
+                    [cmd, key, value, optional_args @ ..]
+                        if cmd.to_uppercase() == "SET".to_string() =>
+                    {
                         match optional_args {
                             [] => {
                                 let redis_value =
@@ -154,6 +160,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                     for el in list_values {
                                         list.push(el.to_string());
                                     }
+                                    notify.notify_one();
 
                                     list.len()
                                 } else {
@@ -164,6 +171,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                 for el in list_values {
                                     list.push(el.to_string());
                                 }
+                                notify.notify_one();
 
                                 let len = list.len();
 
@@ -242,6 +250,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                     for el in list_values {
                                         list.insert(0, el.to_string());
                                     }
+                                    notify.notify_one();
 
                                     list.len()
                                 } else {
@@ -252,6 +261,7 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                                 for el in list_values {
                                     list.insert(0, el.to_string());
                                 }
+                                notify.notify_one();
 
                                 let len = list.len();
 
@@ -283,7 +293,9 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             .write_all(encode_integers(response as i64).as_bytes())
                             .await;
                     }
-                    [cmd, list_key, optional_args @ ..] if cmd.to_uppercase() == "LPOP".to_string() => {
+                    [cmd, list_key, optional_args @ ..]
+                        if cmd.to_uppercase() == "LPOP".to_string() =>
+                    {
                         match optional_args {
                             [] => {
                                 let removed = {
@@ -314,9 +326,9 @@ async fn handle_stream(stream: TcpStream, db: Db) {
 
                                     if let Some(redis_value) = db.get_mut(list_key) {
                                         match &mut redis_value.value {
-                                            ValueType::List(list) => {
-                                                list.drain(..num_to_remove.parse::<usize>().unwrap()).collect::<Vec<_>>()
-                                            }
+                                            ValueType::List(list) => list
+                                                .drain(..num_to_remove.parse::<usize>().unwrap())
+                                                .collect::<Vec<_>>(),
                                             _ => {
                                                 unimplemented!()
                                             }
@@ -331,6 +343,68 @@ async fn handle_stream(stream: TcpStream, db: Db) {
                             _ => unimplemented!(),
                         }
                     }
+                    [cmd, list_key, timeout_seconds]
+                        if cmd.to_uppercase() == "BLPOP".to_string() =>
+                    {
+                        let seconds = timeout_seconds.parse().unwrap();
+                        let removed = {
+                            loop {
+                                // 1. 락 잡고 확인
+                                let has_value = {
+                                    let mut db = db.lock().unwrap();
+                                    // 리스트에 값 있는지 확인
+                                    if let Some(redis_value) = db.get_mut(list_key) {
+                                        if let ValueType::List(list) = &mut redis_value.value {
+                                            if list.len() == 0 { false } else { true }
+                                        } else {
+                                            unimplemented!()
+                                        }
+                                    } else {
+                                        unimplemented!()
+                                    }
+                                }; // 여기서 락 자동 해제
+
+                                if has_value {
+                                    // 3. 다시 락 잡고 꺼내기
+                                    let mut db = db.lock().unwrap();
+                                    if let Some(redis_value) = db.get_mut(list_key) {
+                                        if let ValueType::List(list) = &mut redis_value.value {
+                                            break list.remove(0);
+                                        } else {
+                                            unimplemented!()
+                                        }
+                                    } else {
+                                        unimplemented!()
+                                    }
+                                }
+
+                                match seconds {
+                                    0 => {
+                                        // 2. 락 없이 기다리기
+                                        notify.notified().await;
+                                    }
+                                    _ => {
+                                        if let Err(_) =
+                                            timeout(Duration::from_secs(seconds), notify.notified())
+                                                .await
+                                        {
+                                            println!("did not receive value within {} s", seconds);
+                                            break "".to_string();
+                                        }
+                                    }
+                                }
+                            }
+                        };
+
+                        let removed_ref = removed.as_str();
+                        let response: &[&str] = if removed.is_empty() {
+                            &[]
+                        } else {
+                            &[list_key.as_str(), removed_ref]
+                        };
+
+                        let _ = wr.write_all(encode_arrays(response).as_bytes()).await;
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -338,3 +412,4 @@ async fn handle_stream(stream: TcpStream, db: Db) {
         }
     }
 }
+// 락을 잡고 확인하고 → 락을 놓고 → 기다리고 → 다시 락 잡고 꺼내는 순서
