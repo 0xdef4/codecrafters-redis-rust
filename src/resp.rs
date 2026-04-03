@@ -99,20 +99,20 @@ pub fn decode_bulk_strings(input: String) -> String {
 /// *2\r\n$5\r\nhello\r\n$5\r\nworld\r\n
 /// ```
 pub fn encode_arrays(arr: &[&str]) -> String {
-    if arr.is_empty() {
-        format!("*-1\r\n")
-    } else {
-        let mut output = String::new();
-        output.push_str("*");
-        output.push_str(&arr.len().to_string());
-        output.push_str("\r\n");
+    let mut output = String::new();
+    output.push_str("*");
+    output.push_str(&arr.len().to_string());
+    output.push_str("\r\n");
 
-        for el in arr {
-            output.push_str(&encode_bulk_strings(el.to_string()));
-        }
-
-        output
+    for el in arr {
+        output.push_str(&encode_bulk_strings(el.to_string()));
     }
+
+    output
+}
+
+pub fn encode_null_array() -> String {
+    format!("*-1\r\n")
 }
 
 /// RESP decode arrays'

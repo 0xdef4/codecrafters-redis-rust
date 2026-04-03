@@ -392,8 +392,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             timeout(Duration::from_secs(seconds), notify.notified())
                                                 .await
                                         {
-                                            println!("did not receive value within {} s", seconds);
-                                            break "".to_string();
+                                            let _ = wr.write_all(encode_null_array().as_bytes()).await;
+                                            return;
                                         }
                                     }
                                 }
@@ -401,12 +401,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         };
 
                         let removed_ref = removed.as_str();
-                        let response: &[&str] = if removed.is_empty() {
-                            &[]
-                        } else {
-                            &[list_key.as_str(), removed_ref]
-                        };
-
+                        let response: &[&str] = &[list_key.as_str(), removed_ref];
                         let _ = wr.write_all(encode_arrays(response).as_bytes()).await;
                     }
                     _ => unreachable!(),
