@@ -24,8 +24,6 @@ async fn main() {
     loop {
         match listener.accept().await {
             Ok((stream, _addr)) => {
-                // println!("socket addr: {:?}", addr);
-
                 let db = Arc::clone(&db);
                 let notify = Arc::clone(&notify);
 
@@ -153,7 +151,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         if cmd.to_uppercase() == "RPUSH".to_string() =>
                     {
                         let list_length = {
-                            // error here
                             let mut db = db.lock().unwrap();
 
                             if let Some(redis_value) = db.get_mut(list_key) {
@@ -350,11 +347,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         let seconds = timeout_seconds.parse().unwrap();
                         let removed = {
                             loop {
-                                // 1. 락 잡고 확인
                                 let has_value = {
-                                    // error here
                                     let mut db = db.lock().unwrap();
-                                    // 리스트에 값 있는지 확인
                                     if let Some(redis_value) = db.get_mut(list_key) {
                                         if let ValueType::List(list) = &mut redis_value.value {
                                             if list.len() == 0 { false } else { true }
@@ -362,14 +356,11 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             unimplemented!()
                                         }
                                     } else {
-                                        // error here
-                                        // unimplemented!()
                                         false
                                     }
-                                }; // 여기서 락 자동 해제
+                                };
 
                                 if has_value {
-                                    // 3. 다시 락 잡고 꺼내기
                                     let mut db = db.lock().unwrap();
                                     if let Some(redis_value) = db.get_mut(list_key) {
                                         if let ValueType::List(list) = &mut redis_value.value {
@@ -384,7 +375,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                                 match seconds {
                                     0 => {
-                                        // 2. 락 없이 기다리기
                                         notify.notified().await;
                                     }
                                     _ => {
@@ -392,7 +382,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             timeout(Duration::from_secs(seconds), notify.notified())
                                                 .await
                                         {
-                                            let _ = wr.write_all(encode_null_array().as_bytes()).await;
+                                            let _ =
+                                                wr.write_all(encode_null_array().as_bytes()).await;
                                             return;
                                         }
                                     }
@@ -411,4 +402,3 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
         }
     }
 }
-// 락을 잡고 확인하고 → 락을 놓고 → 기다리고 → 다시 락 잡고 꺼내는 순서

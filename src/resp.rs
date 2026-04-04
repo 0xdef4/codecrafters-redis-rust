@@ -111,6 +111,7 @@ pub fn encode_arrays(arr: &[&str]) -> String {
     output
 }
 
+/// encode null array
 pub fn encode_null_array() -> String {
     format!("*-1\r\n")
 }
