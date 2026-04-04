@@ -7,6 +7,11 @@ pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
 pub enum ValueType {
     String(String),
     List(Vec<String>),
+    Set(),
+    Zset(),
+    Hash(),
+    Stream(),
+    Vectorset(),
 }
 
 pub struct RedisValue {

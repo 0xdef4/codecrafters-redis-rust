@@ -397,6 +397,29 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         let response: &[&str] = &[list_key.as_str(), removed_ref];
                         let _ = wr.write_all(encode_arrays(response).as_bytes()).await;
                     }
+                    [cmd, list_key] if cmd.to_uppercase() == "TYPE".to_string() => {
+                        let type_of_value = {
+                            let db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get(list_key) {
+                                match &redis_value.value {
+                                    ValueType::String(_) => "string".to_string(),
+                                    ValueType::List(_) => "list".to_string(),
+                                    ValueType::Set() => "set".to_string(),
+                                    ValueType::Zset() => "zset".to_string(),
+                                    ValueType::Hash() => "hash".to_string(),
+                                    ValueType::Stream() => "stream".to_string(),
+                                    ValueType::Vectorset() => "vectorset".to_string(),
+                                }
+                            } else {
+                                "none".to_string()
+                            }
+                        };
+
+                        let _ = wr
+                            .write_all(encode_simple_strings(type_of_value).as_bytes())
+                            .await;
+                    }
                     _ => unreachable!(),
                 }
             }
