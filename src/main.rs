@@ -344,7 +344,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     [cmd, list_key, timeout_seconds]
                         if cmd.to_uppercase() == "BLPOP".to_string() =>
                     {
-                        let seconds = timeout_seconds.parse().unwrap();
+                        let seconds: f64 = timeout_seconds.parse().unwrap();
                         let removed = {
                             loop {
                                 let has_value = {
@@ -374,13 +374,15 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 }
 
                                 match seconds {
-                                    0 => {
+                                    0.0 => {
                                         notify.notified().await;
                                     }
                                     _ => {
-                                        if let Err(_) =
-                                            timeout(Duration::from_secs(seconds), notify.notified())
-                                                .await
+                                        if let Err(_) = timeout(
+                                            Duration::from_secs_f64(seconds),
+                                            notify.notified(),
+                                        )
+                                        .await
                                         {
                                             let _ =
                                                 wr.write_all(encode_null_array().as_bytes()).await;
