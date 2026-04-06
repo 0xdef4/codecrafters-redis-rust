@@ -440,6 +440,9 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                                             println!("last_milliseconds : {}", last_milliseconds);
                                             println!("last_sequence_number : {}", last_sequence_number);
+
+                                            println!("current_milliseconds : {}", current_milliseconds);
+                                            println!("current_sequence_number : {}", current_sequence_number);
                                             
                                             if last_milliseconds.parse::<u64>().unwrap()
                                                 > current_milliseconds.parse::<u64>().unwrap()
