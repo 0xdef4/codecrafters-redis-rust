@@ -423,7 +423,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     [cmd, stream_key, entry_id, pairs @ ..]
                         if cmd.to_uppercase() == "XADD".to_string() =>
                     {
-                        // validate entry id
                         let error_message = {
                             let mut db = db.lock().unwrap();
 
@@ -438,21 +437,23 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             let (current_milliseconds, current_sequence_number) =
                                                 entry_id.split_once("-").unwrap();
 
-                                            if current_milliseconds.parse::<u64>().unwrap() == 0
-                                                && current_sequence_number.parse::<u64>().unwrap()
-                                                    == 0
+                                            let last_milliseconds =
+                                                last_milliseconds.parse::<u64>().unwrap();
+                                            let last_sequence_number =
+                                                last_sequence_number.parse::<u64>().unwrap();
+                                            let current_milliseconds =
+                                                current_milliseconds.parse::<u64>().unwrap();
+                                            let current_sequence_number =
+                                                current_sequence_number.parse::<u64>().unwrap();
+
+                                            if current_milliseconds == 0
+                                                && current_sequence_number == 0
                                             {
                                                 "ERR The ID specified in XADD must be greater than 0-0".to_string()
-                                            } else if last_milliseconds.parse::<u64>().unwrap()
-                                                > current_milliseconds.parse::<u64>().unwrap()
-                                            {
+                                            } else if last_milliseconds > current_milliseconds {
                                                 "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
-                                            } else if last_milliseconds.parse::<u64>().unwrap()
-                                                == current_milliseconds.parse::<u64>().unwrap()
-                                                && last_sequence_number.parse::<u64>().unwrap()
-                                                    >= current_sequence_number
-                                                        .parse::<u64>()
-                                                        .unwrap()
+                                            } else if last_milliseconds == current_milliseconds
+                                                && last_sequence_number >= current_sequence_number
                                             {
                                                 "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
                                             } else {
@@ -470,9 +471,12 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 let (current_milliseconds, current_sequence_number) =
                                     entry_id.split_once("-").unwrap();
 
-                                if current_milliseconds.parse::<u64>().unwrap() == 0
-                                    && current_sequence_number.parse::<u64>().unwrap() == 0
-                                {
+                                let current_milliseconds =
+                                    current_milliseconds.parse::<u64>().unwrap();
+                                let current_sequence_number =
+                                    current_sequence_number.parse::<u64>().unwrap();
+
+                                if current_milliseconds == 0 && current_sequence_number == 0 {
                                     "ERR The ID specified in XADD must be greater than 0-0"
                                         .to_string()
                                 } else {
