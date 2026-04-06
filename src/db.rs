@@ -15,6 +15,10 @@ impl StreamEntry {
     pub fn new(id: String, fields: Vec<(String, String)>) -> Self {
         Self { id, fields }
     }
+
+    pub fn get_entry_id(&self) -> String {
+        self.id.clone()
+    }
 }
 
 pub enum ValueType {

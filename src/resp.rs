@@ -24,6 +24,28 @@ pub fn decode_simple_strings(input: String) -> String {
         .to_string()
 }
 
+/// RESP encode simple errors
+///
+/// RESP has specific data types for errors. Simple errors, or simply just errors, are similar to simple strings, but their first character is the minus (-) character.
+/// The difference between simple strings and errors in RESP is that clients should treat errors as exceptions, whereas the string encoded in the error type is the error message itself.
+///
+/// Basic format is:
+/// ```text
+/// -Error message\r\n
+/// ```
+///
+/// # Examples
+/// The following are examples of error replies:
+///
+/// ```text
+/// -ERR unknown command 'asdf'
+/// -WRONGTYPE Operation against a key holding the wrong kind of value
+/// ```
+///
+pub fn encode_simple_errors(error_msg: String) -> String {
+    format!("-{}\r\n", error_msg)
+}
+
 /// RESP encode integers
 /// This type is a CRLF-terminated string that represents a signed, base-10, 64-bit integer.
 

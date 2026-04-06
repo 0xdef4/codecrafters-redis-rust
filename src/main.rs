@@ -423,6 +423,61 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     [cmd, stream_key, entry_id, pairs @ ..]
                         if cmd.to_uppercase() == "XADD".to_string() =>
                     {
+                        // validate entry id
+                        let error_message = {
+                            let mut db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get_mut(stream_key) {
+                                match &mut redis_value.value {
+                                    ValueType::Stream(stream) => {
+                                        if let Some(last) = stream.last() {
+                                            let last_entry_id = last.get_entry_id();
+
+                                            let (last_milliseconds, last_sequence_number) =
+                                                last_entry_id.split_once("-").unwrap();
+                                            let (current_milliseconds, current_sequence_number) =
+                                                entry_id.split_once("-").unwrap();
+
+                                            if last_milliseconds.parse::<u64>().unwrap()
+                                                > current_milliseconds.parse::<u64>().unwrap()
+                                            {
+                                                "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
+                                            } else if last_milliseconds.parse::<u64>().unwrap()
+                                                == current_milliseconds.parse::<u64>().unwrap()
+                                                && last_sequence_number.parse::<u64>().unwrap()
+                                                    >= current_sequence_number
+                                                        .parse::<u64>()
+                                                        .unwrap()
+                                            {
+                                                "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
+                                            } else {
+                                                "".to_string()
+                                            }
+                                        } else {
+                                            unreachable!()
+                                        }
+                                    }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                }
+                            } else {
+                                let (current_milliseconds, current_sequence_number) = entry_id.split_once("-").unwrap();
+
+                                if current_milliseconds.parse::<u64>().unwrap() == 0 && current_sequence_number.parse::<u64>().unwrap() == 0 {
+                                    "ERR The ID specified in XADD must be greater than 0-0".to_string()
+                                } else {
+                                    "".to_string()
+                                }
+                            }
+                        };
+
+                        if !error_message.is_empty() {
+                            let _ = wr
+                                .write_all(encode_simple_errors(error_message).as_bytes())
+                                .await;
+                        }
+
                         let response = {
                             let mut db = db.lock().unwrap();
 
@@ -448,8 +503,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     .chunks(2)
                                     .map(|e| (e[0].clone(), e[1].clone()))
                                     .collect();
-                                let stream_entry =
-                                    StreamEntry::new(entry_id.to_string(), fields);
+                                let stream_entry = StreamEntry::new(entry_id.to_string(), fields);
 
                                 let value = ValueType::Stream(vec![stream_entry]);
                                 let redis_value = RedisValue::new(value, None);
@@ -458,9 +512,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 entry_id.to_string()
                             }
                         };
-                        let _ = wr
-                            .write_all(encode_bulk_strings(response).as_bytes())
-                            .await;
+                        let _ = wr.write_all(encode_bulk_strings(response).as_bytes()).await;
                     }
                     _ => unreachable!(),
                 }
