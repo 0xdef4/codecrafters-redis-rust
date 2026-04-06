@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 /// RESP encode simple strings
 ///
 /// Simple strings are encoded as a plus (+) character, followed by a string. The string mustn't contain a CR (\r) or LF (\n) character and is terminated by CRLF (i.e., \r\n).
@@ -37,7 +39,7 @@ pub fn encode_integers(input: i64) -> String {
 }
 
 /// RESP decode integers
-pub fn decode_integers(input: String) -> i64 {
+pub fn decode_integers(_input: String) -> i64 {
     todo!()
 }
 
@@ -73,7 +75,7 @@ pub fn encode_bulk_strings(input: String) -> String {
 }
 
 /// RESP decode bulk strings
-pub fn decode_bulk_strings(input: String) -> String {
+pub fn decode_bulk_strings(_input: String) -> String {
     todo!()
 }
 

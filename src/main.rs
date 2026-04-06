@@ -408,7 +408,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     ValueType::Set() => "set".to_string(),
                                     ValueType::Zset() => "zset".to_string(),
                                     ValueType::Hash() => "hash".to_string(),
-                                    ValueType::Stream() => "stream".to_string(),
+                                    ValueType::Stream(_) => "stream".to_string(),
                                     ValueType::Vectorset() => "vectorset".to_string(),
                                 }
                             } else {
@@ -420,6 +420,48 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             .write_all(encode_simple_strings(type_of_value).as_bytes())
                             .await;
                     }
+                    [cmd, stream_key, entry_id, pairs @ ..]
+                        if cmd.to_uppercase() == "XADD".to_string() =>
+                    {
+                        let response = {
+                            let mut db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get_mut(stream_key) {
+                                match &mut redis_value.value {
+                                    ValueType::Stream(stream) => {
+                                        let fields = pairs
+                                            .chunks(2)
+                                            .map(|e| (e[0].clone(), e[1].clone()))
+                                            .collect();
+                                        let stream_entry =
+                                            StreamEntry::new(entry_id.to_string(), fields);
+
+                                        stream.push(stream_entry);
+                                        entry_id.to_string()
+                                    }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                }
+                            } else {
+                                let fields = pairs
+                                    .chunks(2)
+                                    .map(|e| (e[0].clone(), e[1].clone()))
+                                    .collect();
+                                let stream_entry =
+                                    StreamEntry::new(entry_id.to_string(), fields);
+
+                                let value = ValueType::Stream(vec![stream_entry]);
+                                let redis_value = RedisValue::new(value, None);
+
+                                db.insert(stream_key.to_string(), redis_value);
+                                entry_id.to_string()
+                            }
+                        };
+                        let _ = wr
+                            .write_all(encode_bulk_strings(response).as_bytes())
+                            .await;
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -427,3 +469,5 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
         }
     }
 }
+
+// TODO : XADD 구현하고 enum 에 impl 붙이는 작업하기

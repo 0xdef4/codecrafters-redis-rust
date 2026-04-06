@@ -1,16 +1,29 @@
+#![allow(unused)]
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
 
+pub struct StreamEntry {
+    pub id: String,
+    pub fields: Vec<(String, String)>,
+}
+
+impl StreamEntry {
+    pub fn new(id: String, fields: Vec<(String, String)>) -> Self {
+        Self { id, fields }
+    }
+}
+
 pub enum ValueType {
     String(String),
     List(Vec<String>),
+    Stream(Vec<StreamEntry>),
     Set(),
     Zset(),
     Hash(),
-    Stream(),
     Vectorset(),
 }
 
