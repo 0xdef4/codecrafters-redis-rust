@@ -438,21 +438,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             let (current_milliseconds, current_sequence_number) =
                                                 entry_id.split_once("-").unwrap();
 
-                                            println!("last_milliseconds : {}", last_milliseconds);
-                                            println!(
-                                                "last_sequence_number : {}",
-                                                last_sequence_number
-                                            );
-
-                                            println!(
-                                                "current_milliseconds : {}",
-                                                current_milliseconds
-                                            );
-                                            println!(
-                                                "current_sequence_number : {}",
-                                                current_sequence_number
-                                            );
-
                                             if current_milliseconds.parse::<u64>().unwrap() == 0
                                                 && current_sequence_number.parse::<u64>().unwrap()
                                                     == 0
@@ -461,7 +446,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             } else if last_milliseconds.parse::<u64>().unwrap()
                                                 > current_milliseconds.parse::<u64>().unwrap()
                                             {
-                                                println!("reaching here??");
                                                 "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
                                             } else if last_milliseconds.parse::<u64>().unwrap()
                                                 == current_milliseconds.parse::<u64>().unwrap()
@@ -498,7 +482,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         };
 
                         if !error_message.is_empty() {
-                            println!("reaching here!!!?");
                             let _ = wr
                                 .write_all(encode_simple_errors(error_message).as_bytes())
                                 .await;
