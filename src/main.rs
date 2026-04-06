@@ -439,12 +439,26 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                 entry_id.split_once("-").unwrap();
 
                                             println!("last_milliseconds : {}", last_milliseconds);
-                                            println!("last_sequence_number : {}", last_sequence_number);
+                                            println!(
+                                                "last_sequence_number : {}",
+                                                last_sequence_number
+                                            );
 
-                                            println!("current_milliseconds : {}", current_milliseconds);
-                                            println!("current_sequence_number : {}", current_sequence_number);
-                                            
-                                            if last_milliseconds.parse::<u64>().unwrap()
+                                            println!(
+                                                "current_milliseconds : {}",
+                                                current_milliseconds
+                                            );
+                                            println!(
+                                                "current_sequence_number : {}",
+                                                current_sequence_number
+                                            );
+
+                                            if current_milliseconds.parse::<u64>().unwrap() == 0
+                                                && current_sequence_number.parse::<u64>().unwrap()
+                                                    == 0
+                                            {
+                                                "ERR The ID specified in XADD must be greater than 0-0".to_string()
+                                            } else if last_milliseconds.parse::<u64>().unwrap()
                                                 > current_milliseconds.parse::<u64>().unwrap()
                                             {
                                                 println!("reaching here??");
@@ -457,8 +471,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                         .unwrap()
                                             {
                                                 "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
-                                            } else if current_milliseconds.parse::<u64>().unwrap() == 0 && current_sequence_number.parse::<u64>().unwrap() == 0 {
-                                                "ERR The ID specified in XADD must be greater than 0-0".to_string()
                                             } else {
                                                 "".to_string()
                                             }
@@ -471,10 +483,14 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     }
                                 }
                             } else {
-                                let (current_milliseconds, current_sequence_number) = entry_id.split_once("-").unwrap();
+                                let (current_milliseconds, current_sequence_number) =
+                                    entry_id.split_once("-").unwrap();
 
-                                if current_milliseconds.parse::<u64>().unwrap() == 0 && current_sequence_number.parse::<u64>().unwrap() == 0 {
-                                    "ERR The ID specified in XADD must be greater than 0-0".to_string()
+                                if current_milliseconds.parse::<u64>().unwrap() == 0
+                                    && current_sequence_number.parse::<u64>().unwrap() == 0
+                                {
+                                    "ERR The ID specified in XADD must be greater than 0-0"
+                                        .to_string()
                                 } else {
                                     "".to_string()
                                 }
@@ -532,5 +548,3 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
         }
     }
 }
-
-// TODO : XADD 구현하고 enum 에 impl 붙이는 작업하기
