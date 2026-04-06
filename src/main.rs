@@ -447,7 +447,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             if last_milliseconds.parse::<u64>().unwrap()
                                                 > current_milliseconds.parse::<u64>().unwrap()
                                             {
-                                                println!("reaching here??")
+                                                println!("reaching here??");
                                                 "ERR The ID specified in XADD is equal or smaller than the target stream top item".to_string()
                                             } else if last_milliseconds.parse::<u64>().unwrap()
                                                 == current_milliseconds.parse::<u64>().unwrap()
