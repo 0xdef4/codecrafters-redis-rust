@@ -438,6 +438,9 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             let (current_milliseconds, current_sequence_number) =
                                                 entry_id.split_once("-").unwrap();
 
+                                            println!("last_milliseconds : {}", last_milliseconds);
+                                            println!("last_sequence_number : {}", last_sequence_number);
+                                            
                                             if last_milliseconds.parse::<u64>().unwrap()
                                                 > current_milliseconds.parse::<u64>().unwrap()
                                             {
