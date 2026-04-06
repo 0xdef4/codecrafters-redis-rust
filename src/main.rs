@@ -484,6 +484,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             let _ = wr
                                 .write_all(encode_simple_errors(error_message).as_bytes())
                                 .await;
+                            continue;
                         }
 
                         let response = {
