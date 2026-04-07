@@ -144,10 +144,10 @@ pub fn encode_null_array() -> String {
 ///
 /// # Examples
 ///
-/// So the the following,
+/// So the following,
 ///
 /// ```text
-/// *2\r\n $4\r\nECHO\r\n$3\r\nhey\r\n
+/// *2\r\n $4\r\nECHO\r\n $3\r\nhey\r\n
 /// ```
 ///
 /// is decoded to,
@@ -159,8 +159,16 @@ pub fn decode_arrays(input: &str) -> Vec<String> {
     input
         .split("\r\n")
         .filter(|e| !e.is_empty())
-        .filter(|e| !e.starts_with('*'))
+        // .filter(|e| !e.starts_with('*'))
         .filter(|e| !e.starts_with('$'))
+        .skip(1)
         .map(|e| e.to_string())
         .collect::<Vec<_>>()
 }
+
+// *5\r\n
+// $4\r\nXADD\r\n
+// $9\r\nblueberry\r\n 
+// $1\r\n*\r\n
+// $3\r\nfoo\r\n
+// $3\r\nbar\r\n
