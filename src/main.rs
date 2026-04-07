@@ -6,7 +6,7 @@ use tokio::time::timeout;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod db;
 mod resp;
@@ -426,11 +426,60 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         // generate entry id
                         let (generated_milliseconds, generated_sqeuence_number) = {
                             let (current_milliseconds, current_sequence_number) =
-                            entry_id.split_once("-").unwrap();
+                                match entry_id.split_once("-") {
+                                    Some((a, b)) => (a, b),
+                                    None => ("*", "*"),
+                                };
 
                             match (current_milliseconds, current_sequence_number) {
                                 ("*", "*") => {
-                                    unimplemented!()
+                                    let db = db.lock().unwrap();
+
+                                    let unix_time_millis = SystemTime::now()
+                                        .duration_since(UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_millis()
+                                        as u64;
+
+                                    if let Some(redis_value) = db.get(stream_key) {
+                                        match &redis_value.value {
+                                            ValueType::Stream(stream) => {
+                                                let mut last_entry_with_same_time = String::new();
+
+                                                for el in stream {
+                                                    let entry_id = el.get_entry_id();
+                                                    match entry_id.split_once("-") {
+                                                        Some((a, b)) => {
+                                                            if a.to_string()
+                                                                == unix_time_millis.to_string()
+                                                            {
+                                                                last_entry_with_same_time =
+                                                                    b.to_string();
+                                                            }
+                                                        }
+                                                        None => {
+                                                            unreachable!()
+                                                        }
+                                                    }
+                                                }
+                                                let next_seq =
+                                                    if last_entry_with_same_time.is_empty() {
+                                                        0
+                                                    } else {
+                                                        last_entry_with_same_time
+                                                            .parse::<u64>()
+                                                            .unwrap()
+                                                            + 1
+                                                    };
+                                                (unix_time_millis.to_string(), next_seq.to_string())
+                                            }
+                                            _ => {
+                                                unimplemented!()
+                                            }
+                                        }
+                                    } else {
+                                        (unix_time_millis.to_string(), "0".to_string())
+                                    }
                                 }
                                 (current_milliseconds, "*") => {
                                     let db = db.lock().unwrap();
