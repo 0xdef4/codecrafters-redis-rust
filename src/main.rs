@@ -550,6 +550,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         let entry_id =
                             format!("{}-{}", generated_milliseconds, generated_sqeuence_number);
 
+                        println!("entry_id : {}", entry_id);
+
                         // validate entry id
                         let error_message = {
                             let mut db = db.lock().unwrap();
