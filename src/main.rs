@@ -423,6 +423,86 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     [cmd, stream_key, entry_id, pairs @ ..]
                         if cmd.to_uppercase() == "XADD".to_string() =>
                     {
+                        // generate entry ids
+                        let (current_milliseconds, current_sequence_number) =
+                            entry_id.split_once("-").unwrap();
+
+                        let (generated_milliseconds, generated_sqeuence_number) = {
+                            match (current_milliseconds, current_sequence_number) {
+                                ("*", "*") => {
+                                    unimplemented!()
+                                }
+                                (current_milliseconds, "*") => {
+                                    let db = db.lock().unwrap();
+
+                                    if let Some(redis_value) = db.get(stream_key) {
+                                        match &redis_value.value {
+                                            ValueType::Stream(stream) => {
+                                                if let Some(last) = stream.last() {
+                                                    let last_entry_id = last.get_entry_id();
+
+                                                    let (last_milliseconds, last_sequence_number) =
+                                                        last_entry_id.split_once("-").unwrap();
+
+                                                    if current_milliseconds.parse::<u64>().unwrap()
+                                                        == 0
+                                                    {
+                                                        (
+                                                            current_milliseconds.to_string(),
+                                                            "1".to_string(),
+                                                        )
+                                                    } else if last_milliseconds
+                                                        != current_milliseconds
+                                                    {
+                                                        (
+                                                            current_milliseconds.to_string(),
+                                                            "0".to_string(),
+                                                        )
+                                                    } else if last_milliseconds
+                                                        == current_milliseconds
+                                                    {
+                                                        (
+                                                            current_milliseconds.to_string(),
+                                                            (last_sequence_number
+                                                                .parse::<u64>()
+                                                                .unwrap()
+                                                                + 1)
+                                                            .to_string(),
+                                                        )
+                                                    } else {
+                                                        unimplemented!()
+                                                    }
+                                                } else {
+                                                    (
+                                                        current_milliseconds.to_string(),
+                                                        "0".to_string(),
+                                                    )
+                                                }
+                                            }
+                                            _ => {
+                                                unimplemented!()
+                                            }
+                                        }
+                                    } else {
+                                        if current_milliseconds.parse::<u64>().unwrap() == 0 {
+                                            (current_milliseconds.to_string(), "1".to_string())
+                                        } else {
+                                            (current_milliseconds.to_string(), "0".to_string())
+                                        }
+                                    }
+                                }
+                                _ => (
+                                    current_milliseconds.to_string(),
+                                    current_sequence_number.to_string(),
+                                ),
+                            }
+                        };
+
+                        // must have complete "entry_id" at this point in code.
+                        let entry_id =
+                            format!("{}-{}", generated_milliseconds, generated_sqeuence_number);
+
+                        // validate entry ids
                         let error_message = {
                             let mut db = db.lock().unwrap();
 
@@ -460,7 +540,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                 "".to_string()
                                             }
                                         } else {
-                                            unreachable!()
+                                            "".to_string()
                                         }
                                     }
                                     _ => {
