@@ -423,11 +423,11 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     [cmd, stream_key, entry_id, pairs @ ..]
                         if cmd.to_uppercase() == "XADD".to_string() =>
                     {
-                        // generate entry ids
-                        let (current_milliseconds, current_sequence_number) =
+                        // generate entry id
+                        let (generated_milliseconds, generated_sqeuence_number) = {
+                            let (current_milliseconds, current_sequence_number) =
                             entry_id.split_once("-").unwrap();
 
-                        let (generated_milliseconds, generated_sqeuence_number) = {
                             match (current_milliseconds, current_sequence_number) {
                                 ("*", "*") => {
                                     unimplemented!()
@@ -498,11 +498,10 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             }
                         };
 
-                        // must have complete "entry_id" at this point in code.
                         let entry_id =
                             format!("{}-{}", generated_milliseconds, generated_sqeuence_number);
 
-                        // validate entry ids
+                        // validate entry id
                         let error_message = {
                             let mut db = db.lock().unwrap();
 
@@ -572,6 +571,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             continue;
                         }
 
+                        // respond
                         let response = {
                             let mut db = db.lock().unwrap();
 
