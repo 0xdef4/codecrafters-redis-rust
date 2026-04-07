@@ -159,16 +159,8 @@ pub fn decode_arrays(input: &str) -> Vec<String> {
     input
         .split("\r\n")
         .filter(|e| !e.is_empty())
-        // .filter(|e| !e.starts_with('*'))
         .filter(|e| !e.starts_with('$'))
         .skip(1)
         .map(|e| e.to_string())
         .collect::<Vec<_>>()
 }
-
-// *5\r\n
-// $4\r\nXADD\r\n
-// $9\r\nblueberry\r\n 
-// $1\r\n*\r\n
-// $3\r\nfoo\r\n
-// $3\r\nbar\r\n
