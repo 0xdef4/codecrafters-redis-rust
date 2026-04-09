@@ -697,7 +697,13 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                 m.parse::<u64>().unwrap(),
                                                 s.parse::<u64>().unwrap(),
                                             ),
-                                            None => (start_id.parse::<u64>().unwrap(), 0),
+                                            None => {
+                                                if start_id == "-" {
+                                                    (0, 0)
+                                                } else {
+                                                    (start_id.parse::<u64>().unwrap(), 0)
+                                                }
+                                            },
                                         };
 
                                         let (em, es) = match end_id.split_once("-") {
@@ -705,7 +711,13 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                 m.parse::<u64>().unwrap(),
                                                 s.parse::<u64>().unwrap(),
                                             ),
-                                            None => (end_id.parse::<u64>().unwrap(), u64::MAX),
+                                            None => {
+                                                if end_id == "+" {
+                                                    (u64::MAX, u64::MAX)
+                                                } else {
+                                                    (end_id.parse::<u64>().unwrap(), u64::MAX)
+                                                }
+                                            }
                                         };
 
                                         let filtered = stream
