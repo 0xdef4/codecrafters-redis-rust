@@ -692,82 +692,35 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             if let Some(redis_value) = db.get(stream_key) {
                                 match &redis_value.value {
                                     ValueType::Stream(stream) => {
-                                        // filter with start_id
-                                        let filtered_with_start_id = match start_id.split_once("-")
-                                        {
-                                            Some((start_millis, start_seq_num)) => stream
-                                                .iter()
-                                                .filter(|e| {
-                                                    let entry_id = e.get_entry_id();
-                                                    let (millis, seq_num) =
-                                                        entry_id.split_once("-").unwrap();
-
-                                                    if millis.parse::<u64>().unwrap()
-                                                        >= start_millis.parse().unwrap()
-                                                    {
-                                                        seq_num.parse::<u64>().unwrap()
-                                                            >= start_seq_num.parse().unwrap()
-                                                    } else {
-                                                        millis.parse::<u64>().unwrap()
-                                                            >= start_millis.parse().unwrap()
-                                                    }
-                                                })
-                                                .cloned()
-                                                .collect::<Vec<_>>(),
-                                            None => stream
-                                                .iter()
-                                                .filter(|e| {
-                                                    let entry_id = e.get_entry_id();
-                                                    let (millis, seq_num) =
-                                                        entry_id.split_once("-").unwrap();
-
-                                                    millis.parse::<u64>().unwrap()
-                                                        >= start_id.parse().unwrap()
-                                                        && seq_num.parse::<u64>().unwrap()
-                                                            >= "0".parse().unwrap()
-                                                })
-                                                .cloned()
-                                                .collect::<Vec<_>>(),
+                                        let (sm, ss) = match start_id.split_once("-") {
+                                            Some((m, s)) => (
+                                                m.parse::<u64>().unwrap(),
+                                                s.parse::<u64>().unwrap(),
+                                            ),
+                                            None => (start_id.parse::<u64>().unwrap(), 0),
                                         };
 
-                                        // filter with end_id
-                                        let filtered = match end_id.split_once("-") {
-                                            Some((end_millis, end_seq_num)) => {
-                                                filtered_with_start_id
-                                                    .iter()
-                                                    .filter(|e| {
-                                                        let entry_id = e.get_entry_id();
-                                                        let (millis, seq_num) =
-                                                            entry_id.split_once("-").unwrap();
-
-                                                        if millis.parse::<u64>().unwrap()
-                                                            <= end_millis.parse().unwrap()
-                                                        {
-                                                            seq_num.parse::<u64>().unwrap()
-                                                                <= end_seq_num.parse().unwrap()
-                                                        } else {
-                                                            millis.parse::<u64>().unwrap()
-                                                                <= end_millis.parse().unwrap()
-                                                        }
-                                                    })
-                                                    .cloned()
-                                                    .collect::<Vec<_>>()
-                                            }
-                                            None => {
-                                                filtered_with_start_id
-                                                    .iter()
-                                                    .filter(|e| {
-                                                        let entry_id = e.get_entry_id();
-                                                        let (millis, _seq_num) =
-                                                            entry_id.split_once("-").unwrap();
-
-                                                        millis.parse::<u64>().unwrap()
-                                                            < end_id.parse::<u64>().unwrap() + 1
-                                                    })
-                                                    .cloned()
-                                                    .collect::<Vec<_>>()
-                                            }
+                                        let (em, es) = match end_id.split_once("-") {
+                                            Some((m, s)) => (
+                                                m.parse::<u64>().unwrap(),
+                                                s.parse::<u64>().unwrap(),
+                                            ),
+                                            None => (end_id.parse::<u64>().unwrap(), u64::MAX),
                                         };
+
+                                        let filtered = stream
+                                            .iter()
+                                            .filter(|e| {
+                                                let entry_id = e.get_entry_id();
+                                                let (m, s) = entry_id.split_once("-").unwrap();
+                                                let (m, s) = (
+                                                    m.parse::<u64>().unwrap(),
+                                                    s.parse::<u64>().unwrap(),
+                                                );
+                                                (m, s) >= (sm, ss) && (m, s) <= (em, es)
+                                            })
+                                            .cloned()
+                                            .collect::<Vec<_>>();
 
                                         println!("filtered : {:?}", filtered);
 
