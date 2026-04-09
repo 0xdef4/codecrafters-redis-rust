@@ -1,5 +1,43 @@
 #![allow(unused)]
 
+pub enum RespValue {
+    // RESP2
+    SimpleString(String),
+    SimpleError(String),
+    Integers(i64),
+    BulkString(String),
+    BulkStringNull,
+    Array(Vec<RespValue>),
+    ArrayNull,
+
+    // RESP3
+    Null,
+}
+
+pub fn encode(input: RespValue) -> String {
+    match input {
+        RespValue::SimpleString(s) => format!("+{}\r\n", s),
+        RespValue::SimpleError(s) => format!("-{}\r\n", s),
+        RespValue::Integers(n) => format!(":{}\r\n", n),
+        RespValue::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
+        RespValue::BulkStringNull => "$-1\r\n".to_string(),
+        RespValue::Array(arr) => {
+            let mut output = String::new();
+            output.push_str("*");
+            output.push_str(&arr.len().to_string());
+            output.push_str("\r\n");
+
+            for el in arr {
+                output.push_str(&encode(el));
+            }
+
+            output
+        }
+        RespValue::ArrayNull => "*-1\r\n".to_string(),
+        RespValue::Null => "_\r\n".to_string(),
+    }
+}
+
 /// RESP encode simple strings
 ///
 /// Simple strings are encoded as a plus (+) character, followed by a string. The string mustn't contain a CR (\r) or LF (\n) character and is terminated by CRLF (i.e., \r\n).
@@ -48,7 +86,7 @@ pub fn encode_simple_errors(error_msg: String) -> String {
 
 /// RESP encode integers
 /// This type is a CRLF-terminated string that represents a signed, base-10, 64-bit integer.
-
+///
 /// RESP encodes integers in the following way:
 ///
 /// ```text

@@ -60,7 +60,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     }
                     [cmd, arg] if cmd.to_uppercase() == "ECHO".to_string() => {
                         let _ = wr
-                            .write_all(encode_bulk_strings(arg.clone()).as_bytes())
+                            .write_all(encode(RespValue::BulkString(arg.clone())).as_bytes())
                             .await;
                     }
                     [cmd, key, value, optional_args @ ..]
@@ -75,7 +75,10 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     db.insert(key.to_string(), redis_value);
                                 }
                                 let _ = wr
-                                    .write_all(encode_simple_strings("OK".to_string()).as_bytes())
+                                    .write_all(
+                                        encode(RespValue::SimpleString("OK".to_string()))
+                                            .as_bytes(),
+                                    )
                                     .await;
                             }
                             [option, seconds] if option.to_uppercase() == "EX" => {
@@ -92,7 +95,10 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     db.insert(key.to_string(), redis_value);
                                 }
                                 let _ = wr
-                                    .write_all(encode_simple_strings("OK".to_string()).as_bytes())
+                                    .write_all(
+                                        encode(RespValue::SimpleString("OK".to_string()))
+                                            .as_bytes(),
+                                    )
                                     .await;
                             }
                             [option, milliseconds] if option.to_uppercase() == "PX" => {
@@ -109,7 +115,10 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     db.insert(key.to_string(), redis_value);
                                 }
                                 let _ = wr
-                                    .write_all(encode_simple_strings("OK".to_string()).as_bytes())
+                                    .write_all(
+                                        encode(RespValue::SimpleString("OK".to_string()))
+                                            .as_bytes(),
+                                    )
                                     .await;
                             }
                             _ => unreachable!(),
@@ -123,25 +132,25 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 match redis_value.expires_at {
                                     Some(instant) => {
                                         if Instant::now() > instant {
-                                            encode_bulk_strings("".to_string())
+                                            encode(RespValue::BulkStringNull)
                                         } else {
                                             match &redis_value.value {
-                                                ValueType::String(string) => {
-                                                    encode_bulk_strings(string.to_string())
-                                                }
+                                                ValueType::String(string) => encode(
+                                                    RespValue::BulkString(string.to_string()),
+                                                ),
                                                 _ => unimplemented!(),
                                             }
                                         }
                                     }
                                     None => match &redis_value.value {
                                         ValueType::String(string) => {
-                                            encode_bulk_strings(string.to_string())
+                                            encode(RespValue::BulkString(string.to_string()))
                                         }
                                         _ => unimplemented!(),
                                     },
                                 }
                             } else {
-                                encode_bulk_strings("".to_string())
+                                encode(RespValue::BulkStringNull)
                             }
                         };
 
@@ -181,7 +190,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             }
                         };
                         let _ = wr
-                            .write_all(encode_integers(list_length as i64).as_bytes())
+                            .write_all(encode(RespValue::Integers(list_length as i64)).as_bytes())
                             .await;
                     }
                     [cmd, list_key, start_index, stop_index]
@@ -234,8 +243,13 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 Vec::new()
                             }
                         };
-                        let refs: Vec<&str> = slice.iter().map(|s| s.as_str()).collect();
-                        let _ = wr.write_all(encode_arrays(&refs).as_bytes()).await;
+                        let array = RespValue::Array(
+                            slice
+                                .iter()
+                                .map(|s| RespValue::BulkString(s.clone()))
+                                .collect(),
+                        );
+                        let _ = wr.write_all(encode(array).as_bytes()).await;
                     }
                     [cmd, list_key, list_values @ ..]
                         if cmd.to_uppercase() == "LPUSH".to_string() =>
@@ -271,7 +285,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             }
                         };
                         let _ = wr
-                            .write_all(encode_integers(list_length as i64).as_bytes())
+                            .write_all(encode(RespValue::Integers(list_length as i64)).as_bytes())
                             .await;
                     }
                     [cmd, list_key] if cmd.to_uppercase() == "LLEN".to_string() => {
@@ -288,7 +302,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             }
                         };
                         let _ = wr
-                            .write_all(encode_integers(response as i64).as_bytes())
+                            .write_all(encode(RespValue::Integers(response as i64)).as_bytes())
                             .await;
                     }
                     [cmd, list_key, optional_args @ ..]
@@ -316,7 +330,9 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         "".to_string()
                                     }
                                 };
-                                let _ = wr.write_all(encode_bulk_strings(removed).as_bytes()).await;
+                                let _ = wr
+                                    .write_all(encode(RespValue::BulkString(removed)).as_bytes())
+                                    .await;
                             }
                             [num_to_remove] => {
                                 let removed = {
@@ -335,8 +351,13 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         unimplemented!()
                                     }
                                 };
-                                let refs: Vec<&str> = removed.iter().map(|s| s.as_str()).collect();
-                                let _ = wr.write_all(encode_arrays(&refs).as_bytes()).await;
+                                let array = RespValue::Array(
+                                    removed
+                                        .iter()
+                                        .map(|e| RespValue::BulkString(e.clone()))
+                                        .collect(),
+                                );
+                                let _ = wr.write_all(encode(array).as_bytes()).await;
                             }
                             _ => unimplemented!(),
                         }
@@ -384,8 +405,9 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         )
                                         .await
                                         {
-                                            let _ =
-                                                wr.write_all(encode_null_array().as_bytes()).await;
+                                            let _ = wr
+                                                .write_all(encode(RespValue::ArrayNull).as_bytes())
+                                                .await;
                                             return;
                                         }
                                     }
@@ -393,9 +415,11 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             }
                         };
 
-                        let removed_ref = removed.as_str();
-                        let response: &[&str] = &[list_key.as_str(), removed_ref];
-                        let _ = wr.write_all(encode_arrays(response).as_bytes()).await;
+                        let response = RespValue::Array(vec![
+                            RespValue::BulkString(list_key.to_string()),
+                            RespValue::BulkString(removed),
+                        ]);
+                        let _ = wr.write_all(encode(response).as_bytes()).await;
                     }
                     [cmd, list_key] if cmd.to_uppercase() == "TYPE".to_string() => {
                         let type_of_value = {
@@ -417,7 +441,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         };
 
                         let _ = wr
-                            .write_all(encode_simple_strings(type_of_value).as_bytes())
+                            .write_all(encode(RespValue::SimpleString(type_of_value)).as_bytes())
                             .await;
                     }
                     [cmd, stream_key, entry_id, pairs @ ..]
@@ -615,7 +639,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                         if !error_message.is_empty() {
                             let _ = wr
-                                .write_all(encode_simple_errors(error_message).as_bytes())
+                                .write_all(encode(RespValue::SimpleError(error_message)).as_bytes())
                                 .await;
                             continue;
                         }
@@ -655,7 +679,118 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 entry_id.to_string()
                             }
                         };
-                        let _ = wr.write_all(encode_bulk_strings(response).as_bytes()).await;
+                        let _ = wr
+                            .write_all(encode(RespValue::BulkString(response)).as_bytes())
+                            .await;
+                    }
+                    [cmd, stream_key, start_id, end_id]
+                        if cmd.to_uppercase() == "XRANGE".to_string() =>
+                    {
+                        let filtered = {
+                            let db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get(stream_key) {
+                                match &redis_value.value {
+                                    ValueType::Stream(stream) => {
+                                        // filter with start_id
+                                        let filtered_with_start_id = match start_id.split_once("-")
+                                        {
+                                            Some((start_millis, start_seq_num)) => stream
+                                                .iter()
+                                                .filter(|e| {
+                                                    let entry_id = e.get_entry_id();
+                                                    let (millis, seq_num) =
+                                                        entry_id.split_once("-").unwrap();
+
+                                                    if millis.parse::<u64>().unwrap()
+                                                        >= start_millis.parse().unwrap()
+                                                    {
+                                                        seq_num.parse::<u64>().unwrap()
+                                                            >= start_seq_num.parse().unwrap()
+                                                    } else {
+                                                        millis.parse::<u64>().unwrap()
+                                                            >= start_millis.parse().unwrap()
+                                                    }
+                                                })
+                                                .cloned()
+                                                .collect::<Vec<_>>(),
+                                            None => stream
+                                                .iter()
+                                                .filter(|e| {
+                                                    let entry_id = e.get_entry_id();
+                                                    let (millis, seq_num) =
+                                                        entry_id.split_once("-").unwrap();
+
+                                                    millis.parse::<u64>().unwrap()
+                                                        >= start_id.parse().unwrap()
+                                                        && seq_num.parse::<u64>().unwrap()
+                                                            >= "0".parse().unwrap()
+                                                })
+                                                .cloned()
+                                                .collect::<Vec<_>>(),
+                                        };
+
+                                        // filter with end_id
+                                        let filtered = match end_id.split_once("-") {
+                                            Some((end_millis, end_seq_num)) => {
+                                                filtered_with_start_id
+                                                    .iter()
+                                                    .filter(|e| {
+                                                        let entry_id = e.get_entry_id();
+                                                        let (millis, seq_num) =
+                                                            entry_id.split_once("-").unwrap();
+
+                                                        if millis.parse::<u64>().unwrap()
+                                                            <= end_millis.parse().unwrap()
+                                                        {
+                                                            seq_num.parse::<u64>().unwrap()
+                                                                <= end_seq_num.parse().unwrap()
+                                                        } else {
+                                                            millis.parse::<u64>().unwrap()
+                                                                <= end_millis.parse().unwrap()
+                                                        }
+                                                    })
+                                                    .cloned()
+                                                    .collect::<Vec<_>>()
+                                            }
+                                            None => {
+                                                filtered_with_start_id
+                                                    .iter()
+                                                    .filter(|e| {
+                                                        let entry_id = e.get_entry_id();
+                                                        let (millis, _seq_num) =
+                                                            entry_id.split_once("-").unwrap();
+
+                                                        millis.parse::<u64>().unwrap()
+                                                            < end_id.parse::<u64>().unwrap() + 1
+                                                    })
+                                                    .cloned()
+                                                    .collect::<Vec<_>>()
+                                            }
+                                        };
+
+                                        println!("filtered : {:?}", filtered);
+
+                                        filtered
+                                    }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                }
+                            } else {
+                                // TODO
+                                unimplemented!()
+                            }
+                        };
+
+                        let response = filtered
+                            .iter()
+                            .map(|e| e.to_resp_value())
+                            .collect::<Vec<_>>();
+
+                        let _ = wr
+                            .write_all(encode(RespValue::Array(response)).as_bytes())
+                            .await;
                     }
                     _ => unreachable!(),
                 }
