@@ -10,8 +10,8 @@ pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
 
 #[derive(Debug, Clone)]
 pub struct StreamEntry {
-    pub id: String,
-    pub fields: Vec<(String, String)>,
+    id: String,
+    fields: Vec<(String, String)>,
 }
 
 impl StreamEntry {
