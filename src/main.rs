@@ -693,17 +693,17 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 match &redis_value.value {
                                     ValueType::Stream(stream) => {
                                         let (sm, ss) = match start_id.split_once("-") {
-                                            Some((m, s)) => (
-                                                m.parse::<u64>().unwrap(),
-                                                s.parse::<u64>().unwrap(),
-                                            ),
-                                            None => {
-                                                if start_id == "-" {
+                                            Some((m, s)) => {
+                                                if m.is_empty() && s.is_empty() {
                                                     (0, 0)
                                                 } else {
-                                                    (start_id.parse::<u64>().unwrap(), 0)
+                                                    (
+                                                        m.parse::<u64>().unwrap(),
+                                                        s.parse::<u64>().unwrap(),
+                                                    )
                                                 }
-                                            },
+                                            }
+                                            None => (start_id.parse::<u64>().unwrap(), 0),
                                         };
 
                                         let (em, es) = match end_id.split_once("-") {
