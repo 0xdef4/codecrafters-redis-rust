@@ -765,9 +765,11 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         let keys = &rest[..half];
                         let ids = &rest[half..];
 
-                        let mut response = Vec::new();
+                        let mut streams = Vec::new();
 
                         for (stream_key, entry_id) in keys.iter().zip(ids) {
+                            let mut stream = Vec::new();
+
                             let filtered = {
                                 let db = db.lock().unwrap();
 
@@ -815,12 +817,14 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 .map(|e| e.to_resp_value())
                                 .collect::<Vec<_>>();
 
-                            response.push(RespValue::BulkString(stream_key.to_string()));
-                            response.push(RespValue::Array(filtered_resp_value));
+                            stream.push(RespValue::BulkString(stream_key.to_string()));
+                            stream.push(RespValue::Array(filtered_resp_value));
+
+                            streams.push(RespValue::Array(stream));
                         }
 
                         let _ = wr
-                            .write_all(encode(RespValue::Array(response)).as_bytes())
+                            .write_all(encode(RespValue::Array(streams)).as_bytes())
                             .await;
                     }
                     _ => unreachable!(),
