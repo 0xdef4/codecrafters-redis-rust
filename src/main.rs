@@ -743,7 +743,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     }
                                 }
                             } else {
-                                // TODO
                                 unimplemented!()
                             }
                         };
@@ -752,6 +751,73 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             .iter()
                             .map(|e| e.to_resp_value())
                             .collect::<Vec<_>>();
+
+                        let _ = wr
+                            .write_all(encode(RespValue::Array(response)).as_bytes())
+                            .await;
+                    }
+                    [cmd1, cmd2, rest @ ..]
+                        if cmd1.to_uppercase() == "XREAD".to_string()
+                            && cmd2.to_uppercase() == "STREAMS".to_string() =>
+                    {
+                        // parse command
+                        let half = rest.len() / 2;
+                        let keys = &rest[..half];
+                        let ids = &rest[half..];
+
+                        let mut response = Vec::new();
+
+                        for (stream_key, entry_id) in keys.iter().zip(ids) {
+                            let filtered = {
+                                let db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get(stream_key) {
+                                    match &redis_value.value {
+                                        ValueType::Stream(stream) => {
+                                            let (em, es) = match entry_id.split_once("-") {
+                                                Some((m, s)) => (
+                                                    m.parse::<u64>().unwrap(),
+                                                    s.parse::<u64>().unwrap(),
+                                                ),
+                                                None => {
+                                                    // not mentioned in problem set but..
+                                                    (entry_id.parse::<u64>().unwrap(), 0)
+                                                }
+                                            };
+
+                                            let filtered = stream
+                                                .iter()
+                                                .filter(|e| {
+                                                    let entry_id = e.get_entry_id();
+                                                    let (m, s) = entry_id.split_once("-").unwrap();
+                                                    let (m, s) = (
+                                                        m.parse::<u64>().unwrap(),
+                                                        s.parse::<u64>().unwrap(),
+                                                    );
+                                                    (m, s) > (em, es)
+                                                })
+                                                .cloned()
+                                                .collect::<Vec<_>>();
+
+                                            filtered
+                                        }
+                                        _ => {
+                                            unimplemented!()
+                                        }
+                                    }
+                                } else {
+                                    unimplemented!()
+                                }
+                            };
+
+                            let filtered_resp_value = filtered
+                                .iter()
+                                .map(|e| e.to_resp_value())
+                                .collect::<Vec<_>>();
+
+                            response.push(RespValue::BulkString(stream_key.to_string()));
+                            response.push(RespValue::Array(filtered_resp_value));
+                        }
 
                         let _ = wr
                             .write_all(encode(RespValue::Array(response)).as_bytes())
