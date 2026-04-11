@@ -884,11 +884,20 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                             }
                                         }
                                         None => {
-                                            let db = db.lock().unwrap();
-                                            if db.get(stream_key).is_none() {
+                                            let key_exists = {
+                                                let db = db.lock().unwrap();
+                                                if db.get(stream_key).is_none() {
+                                                    true
+                                                } else {
+                                                    false
+                                                }
+                                            };
+
+                                            if key_exists {
                                                 let _ = wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
                                                 return;
                                             }
+
                                             break Vec::new();
                                         }
                                     }
