@@ -780,7 +780,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                             let filtered = {
                                 
-                                println!("entry_id : {}", entry_id);
+                                // println!("entry_id : {}", entry_id);
 
                                 let resolved = match entry_id.as_str() {
                                     "$" => {

@@ -194,11 +194,37 @@ pub fn encode_null_array() -> String {
 /// ["ECHO", "hey"]
 /// ```
 pub fn decode_arrays(input: &str) -> Vec<String> {
-    input
+    let parts: Vec<&str> = input
         .split("\r\n")
         .filter(|e| !e.is_empty())
-        .filter(|e| !e.starts_with('$'))
-        .skip(1)
-        .map(|e| e.to_string())
-        .collect::<Vec<_>>()
+        .collect();
+
+    let mut result = Vec::new();
+    let mut i = 1; // skip the *N array header
+
+    while i < parts.len() {
+        let part = parts[i];
+        if part.starts_with('$') {
+            // 다음 라인이 실제 값
+            if i + 1 < parts.len() {
+                result.push(parts[i + 1].to_string());
+                i += 2;
+            } else {
+                i += 1;
+            }
+        } else if part.starts_with('*') {
+            i += 1; // array header skip
+        } else {
+            i += 1;
+        }
+    }
+
+    result
 }
+// XREAD block 0 streams apple $
+
+//  "*6\r\n  $5\r\nXREAD\r\n  $5\r\nblock\r\n  $1\r\n0\r\n  $7\r\nstreams\r\n  $5\r\napple\r\n  $1\r\n$\r\n"
+// [*6 , $5, XREAD,   $5, block,   $1,  , 0,  $7, streams,  $5,apple,  $1,$,""]
+// [*6 , $5, XREAD,   $5, block,   $1,  , 0,  $7, streams,  $5,apple,  $1,$,]
+
+// ["XREAD", "block", "0", "streams", "apple"]
