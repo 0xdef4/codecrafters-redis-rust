@@ -807,6 +807,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     }
                                 };
 
+                                println!("resolved : {:?}", resolved);
+
                                 loop {
                                     let notified = notify.notified();
 
