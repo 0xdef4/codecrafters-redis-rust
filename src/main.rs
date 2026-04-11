@@ -875,8 +875,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                 0 => {
                                                     notified.await;
                                                 },
-                                                _ => {
-                                                    if let Err(_) = timeout(Duration::from_millis(block_ms), notified).await {
+                                                n => {
+                                                    if let Err(_) = timeout(Duration::from_millis(n), notified).await {
                                                         let _ = wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
                                                         return;
                                                     }
