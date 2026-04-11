@@ -779,9 +779,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             let mut stream = Vec::new();
 
                             let filtered = {
-                                
-                                // println!("entry_id : {}", entry_id);
-
                                 let resolved = match entry_id.as_str() {
                                     "$" => {
                                         let db = db.lock().unwrap();
@@ -809,8 +806,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         (m.parse::<u64>().unwrap(), s.parse::<u64>().unwrap())
                                     }
                                 };
-
-                                // println!("resolved : {:?}", resolved);
 
                                 loop {
                                     let notified = notify.notified();
