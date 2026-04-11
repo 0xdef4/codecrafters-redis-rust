@@ -207,10 +207,3 @@ pub fn decode_arrays(input: &str) -> Vec<String> {
 
     result
 }
-// XREAD block 0 streams apple $
-
-//  "*6\r\n  $5\r\nXREAD\r\n  $5\r\nblock\r\n  $1\r\n0\r\n  $7\r\nstreams\r\n  $5\r\napple\r\n  $1\r\n$\r\n"
-
-// [*6 , $5, XREAD,   $5, block,   $1,  , 0,  $7, streams,  $5,apple,  $1,$,]
-
-// ["XREAD", "block", "0", "streams", "apple"]
