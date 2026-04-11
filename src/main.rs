@@ -369,7 +369,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         let removed = {
                             loop {
                                 let notified = notify.notified();
-                                
+
                                 let has_value = {
                                     let mut db = db.lock().unwrap();
                                     if let Some(redis_value) = db.get_mut(list_key) {
@@ -401,11 +401,9 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         notified.await;
                                     }
                                     _ => {
-                                        if let Err(_) = timeout(
-                                            Duration::from_secs_f64(seconds),
-                                            notified,
-                                        )
-                                        .await
+                                        if let Err(_) =
+                                            timeout(Duration::from_secs_f64(seconds), notified)
+                                                .await
                                         {
                                             let _ = wr
                                                 .write_all(encode(RespValue::ArrayNull).as_bytes())
@@ -781,6 +779,34 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             let mut stream = Vec::new();
 
                             let filtered = {
+                                let resolved = match entry_id.as_str() {
+                                    "$" => {
+                                        let db = db.lock().unwrap();
+                                        if let Some(rv) = db.get(stream_key) {
+                                            if let ValueType::Stream(s) = &rv.value {
+                                                s.last()
+                                                    .map(|e| {
+                                                        let id = e.get_entry_id();
+                                                        let (m, s) = id.split_once("-").unwrap();
+                                                        (
+                                                            m.parse::<u64>().unwrap(),
+                                                            s.parse::<u64>().unwrap(),
+                                                        )
+                                                    })
+                                                    .unwrap_or((0, 0))
+                                            } else {
+                                                (0, 0)
+                                            }
+                                        } else {
+                                            (0, 0)
+                                        }
+                                    }
+                                    _ => {
+                                        let (m, s) = entry_id.split_once("-").unwrap();
+                                        (m.parse::<u64>().unwrap(), s.parse::<u64>().unwrap())
+                                    }
+                                };
+
                                 loop {
                                     let notified = notify.notified();
 
@@ -788,17 +814,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         let db = db.lock().unwrap();
                                         if let Some(redis_value) = db.get(stream_key) {
                                             if let ValueType::Stream(stream) = &redis_value.value {
-                                                let (em, es) = match entry_id.split_once("-") {
-                                                    Some((m, s)) => (
-                                                        m.parse::<u64>().unwrap(),
-                                                        s.parse::<u64>().unwrap(),
-                                                    ),
-                                                    None => {
-                                                        // not mentioned in problem set but..
-                                                        (entry_id.parse::<u64>().unwrap(), 0)
-                                                    }
-                                                };
-
                                                 let filtered = stream
                                                     .iter()
                                                     .filter(|e| {
@@ -809,16 +824,12 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                             m.parse::<u64>().unwrap(),
                                                             s.parse::<u64>().unwrap(),
                                                         );
-                                                        (m, s) > (em, es)
+                                                        (m, s) > resolved
                                                     })
                                                     .cloned()
                                                     .collect::<Vec<_>>();
 
-                                                if filtered.is_empty() {
-                                                    false
-                                                } else {
-                                                    true
-                                                }
+                                                if filtered.is_empty() { false } else { true }
                                             } else {
                                                 unimplemented!()
                                             }
@@ -832,17 +843,6 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                         if let Some(redis_value) = db.get(stream_key) {
                                             match &redis_value.value {
                                                 ValueType::Stream(stream) => {
-                                                    let (em, es) = match entry_id.split_once("-") {
-                                                        Some((m, s)) => (
-                                                            m.parse::<u64>().unwrap(),
-                                                            s.parse::<u64>().unwrap(),
-                                                        ),
-                                                        None => {
-                                                            // not mentioned in problem set but..
-                                                            (entry_id.parse::<u64>().unwrap(), 0)
-                                                        }
-                                                    };
-
                                                     let filtered = stream
                                                         .iter()
                                                         .filter(|e| {
@@ -853,7 +853,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                                                 m.parse::<u64>().unwrap(),
                                                                 s.parse::<u64>().unwrap(),
                                                             );
-                                                            (m, s) > (em, es)
+                                                            (m, s) > resolved
                                                         })
                                                         .cloned()
                                                         .collect::<Vec<_>>();
@@ -870,31 +870,39 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                     }
 
                                     match block_ms {
-                                        Some(block_ms) => {
-                                            match block_ms {
-                                                0 => {
-                                                    notified.await;
-                                                },
-                                                n => {
-                                                    if let Err(_) = timeout(Duration::from_millis(n), notified).await {
-                                                        let _ = wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
-                                                        return;
-                                                    }
+                                        Some(block_ms) => match block_ms {
+                                            0 => {
+                                                notified.await;
+                                            }
+                                            n => {
+                                                if let Err(_) =
+                                                    timeout(Duration::from_millis(n), notified)
+                                                        .await
+                                                {
+                                                    let _ = wr
+                                                        .write_all(
+                                                            encode(RespValue::ArrayNull).as_bytes(),
+                                                        )
+                                                        .await;
+                                                    return;
                                                 }
                                             }
-                                        }
+                                        },
                                         None => {
                                             let key_exists = {
                                                 let db = db.lock().unwrap();
                                                 if db.get(stream_key).is_none() {
-                                                    true
-                                                } else {
                                                     false
+                                                } else {
+                                                    true
                                                 }
                                             };
-
-                                            if key_exists {
-                                                let _ = wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
+                                            if !key_exists {
+                                                let _ = wr
+                                                    .write_all(
+                                                        encode(RespValue::ArrayNull).as_bytes(),
+                                                    )
+                                                    .await;
                                                 return;
                                             }
 
