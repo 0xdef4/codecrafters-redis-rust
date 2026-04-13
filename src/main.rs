@@ -37,6 +37,8 @@ async fn main() {
 }
 
 async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
+    let mut in_multi: bool = false;
+
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
 
@@ -972,9 +974,18 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         }
                     }
                     [cmd] if cmd.to_uppercase() == "MULTI".to_string() => {
+                        in_multi = true;
+
                         let _ = wr
                             .write_all(encode(RespValue::SimpleString("OK".to_string())).as_bytes())
                             .await;
+                    }
+                    [cmd] if cmd.to_uppercase() == "EXEC".to_string() => {
+                        if !in_multi {
+                            let _ = wr
+                                .write_all(encode(RespValue::SimpleError("ERR EXEC without MULTI".to_string())).as_bytes())
+                                .await;
+                        }
                     }
                     _ => unreachable!(),
                 }
