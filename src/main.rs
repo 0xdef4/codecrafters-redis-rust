@@ -981,9 +981,24 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             .await;
                     }
                     [cmd] if cmd.to_uppercase() == "EXEC".to_string() => {
-                        if !in_multi {
+                        if in_multi {
+                            // TODO: execute transaction
+                            // do stuff
+
                             let _ = wr
-                                .write_all(encode(RespValue::SimpleError("ERR EXEC without MULTI".to_string())).as_bytes())
+                                .write_all(encode(RespValue::Array(vec![])).as_bytes())
+                                .await;
+
+                            in_multi = false;
+                            continue;
+                        } else {
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::SimpleError(
+                                        "ERR EXEC without MULTI".to_string(),
+                                    ))
+                                    .as_bytes(),
+                                )
                                 .await;
                         }
                     }
