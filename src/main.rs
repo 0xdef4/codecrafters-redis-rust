@@ -971,6 +971,11 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             }
                         }
                     }
+                    [cmd] if cmd.to_uppercase() == "MULTI".to_string() => {
+                        let _ = wr
+                            .write_all(encode(RespValue::SimpleString("OK".to_string())).as_bytes())
+                            .await;
+                    }
                     _ => unreachable!(),
                 }
             }
