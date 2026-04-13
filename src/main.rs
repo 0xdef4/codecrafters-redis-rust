@@ -927,6 +927,45 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             .write_all(encode(RespValue::Array(streams)).as_bytes())
                             .await;
                     }
+                    [cmd, key] if cmd.to_uppercase() == "INCR".to_string() => {
+
+                        let result = {
+                            let mut db = db.lock().unwrap();
+
+                            if let Some(redis_value) = db.get_mut(key) {
+                                match &mut redis_value.value {
+                                    ValueType::String(string) => {
+
+                                        match string.parse::<f64>() {
+                                            Ok(n) => {
+                                                *string = format!("{}", n + 1.0);
+
+                                                n + 1.0
+                                            },
+                                            Err(_e) => {
+                                                unimplemented!()
+                                            }
+                                        }
+                                    }
+                                    _ => {unreachable!()}
+                                }
+                            } else {
+                                // Key doesn't exist (later stages)
+                                // If the key doesn't exist, the value will be set to 1.
+                                let redis_value =
+                                    RedisValue::new(ValueType::String("1".to_string()), None);
+
+                                db.insert(key.to_string(), redis_value);
+
+                                1.0
+                            }
+                        };
+
+                        let _ = wr
+                            .write_all(encode(RespValue::Integers(result as i64)).as_bytes())
+                            .await;
+
+                    }
                     _ => unreachable!(),
                 }
             }
