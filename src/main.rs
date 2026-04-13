@@ -928,43 +928,48 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             .await;
                     }
                     [cmd, key] if cmd.to_uppercase() == "INCR".to_string() => {
-
-                        let result = {
+                        let result: Result<i64, String> = {
                             let mut db = db.lock().unwrap();
 
                             if let Some(redis_value) = db.get_mut(key) {
                                 match &mut redis_value.value {
-                                    ValueType::String(string) => {
+                                    ValueType::String(string) => match string.parse::<i64>() {
+                                        Ok(n) => {
+                                            *string = format!("{}", n + 1);
 
-                                        match string.parse::<f64>() {
-                                            Ok(n) => {
-                                                *string = format!("{}", n + 1.0);
-
-                                                n + 1.0
-                                            },
-                                            Err(_e) => {
-                                                unimplemented!()
-                                            }
+                                            Ok(n + 1)
                                         }
+                                        Err(_) => {
+                                            Err("ERR value is not an integer or out of range"
+                                                .to_string())
+                                        }
+                                    },
+                                    _ => {
+                                        unreachable!()
                                     }
-                                    _ => {unreachable!()}
                                 }
                             } else {
-                                // Key doesn't exist (later stages)
-                                // If the key doesn't exist, the value will be set to 1.
                                 let redis_value =
                                     RedisValue::new(ValueType::String("1".to_string()), None);
 
                                 db.insert(key.to_string(), redis_value);
 
-                                1.0
+                                Ok(1)
                             }
                         };
 
-                        let _ = wr
-                            .write_all(encode(RespValue::Integers(result as i64)).as_bytes())
-                            .await;
-
+                        match result {
+                            Ok(n) => {
+                                let _ = wr
+                                    .write_all(encode(RespValue::Integers(n)).as_bytes())
+                                    .await;
+                            }
+                            Err(e) => {
+                                let _ = wr
+                                    .write_all(encode(RespValue::SimpleError(e)).as_bytes())
+                                    .await;
+                            }
+                        }
                     }
                     _ => unreachable!(),
                 }
