@@ -990,8 +990,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     }
                     [cmd] if cmd.to_uppercase() == "EXEC".to_string() => {
                         if in_multi {
-                            // TODO: execute transaction
-                            // do stuff
+                            // TODO: execute queued
 
                             let _ = wr
                                 .write_all(encode(RespValue::Array(vec![])).as_bytes())
