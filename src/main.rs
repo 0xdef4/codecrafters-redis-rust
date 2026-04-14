@@ -56,7 +56,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                 let cmd_upper = resp_array[0].to_uppercase();
 
-                if in_multi && cmd_upper != "EXEC" && cmd_upper != "MULTI" {
+                if in_multi && cmd_upper != "EXEC" && cmd_upper != "MULTI" && cmd_upper != "DISCARD" {
                     queue.push(resp_array.clone());
                     let _ = wr
                         .write_all(encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes())
