@@ -56,7 +56,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                 let cmd_upper = resp_array[0].to_uppercase();
 
-                if in_multi && cmd_upper != "EXEC" && cmd_upper != "MULTI" && cmd_upper != "DISCARD" {
+                if in_multi && cmd_upper != "EXEC" && cmd_upper != "MULTI" && cmd_upper != "DISCARD"
+                {
                     queue.push(resp_array.clone());
                     let _ = wr
                         .write_all(encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes())
@@ -1091,29 +1092,26 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                                             if let Some(redis_value) = db.get_mut(key) {
                                                 match &mut redis_value.value {
-                                    ValueType::String(string) => match string.parse::<i64>() {
-                                        Ok(n) => {
-                                            *string = format!("{}", n + 1);
+                                                    ValueType::String(string) => match string.parse::<i64>() {
+                                                        Ok(n) => {
+                                                            *string = format!("{}", n + 1);
 
-                                            Ok(n + 1)
-                                        }
-                                        Err(_) => {
-                                            Err("ERR value is not an integer or out of range"
-                                                .to_string())
-                                        }
-                                    },
-                                    _ => {
-                                        unreachable!()
-                                    }
-                                }
+                                                            Ok(n + 1)
+                                                        }
+                                                        Err(_) => {
+                                                            Err("ERR value is not an integer or out of range".to_string())
+                                                        }
+                                                    },
+                                                    _ => {
+                                                        unreachable!()
+                                                    }
+                                                }
                                             } else {
                                                 let redis_value = RedisValue::new(
                                                     ValueType::String("1".to_string()),
                                                     None,
                                                 );
-
                                                 db.insert(key.to_string(), redis_value);
-
                                                 Ok(1)
                                             }
                                         };
