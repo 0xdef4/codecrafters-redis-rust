@@ -989,11 +989,151 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                             .await;
                     }
                     [cmd] if cmd.to_uppercase() == "EXEC".to_string() => {
+                        let mut responses = Vec::new();
+
                         if in_multi {
-                            // TODO: execute queued
+                            for command in &queue {
+                                let response: RespValue = match command.as_slice() {
+                                    [cmd, key, value, optional_args @ ..]
+                                        if cmd.to_uppercase() == "SET".to_string() =>
+                                    {
+                                        match optional_args {
+                                            [] => {
+                                                let redis_value = RedisValue::new(
+                                                    ValueType::String(value.to_string()),
+                                                    None,
+                                                );
+                                                {
+                                                    let mut db = db.lock().unwrap();
+                                                    db.insert(key.to_string(), redis_value);
+                                                }
+
+                                                RespValue::SimpleString("OK".to_string())
+                                            }
+                                            [option, seconds] if option.to_uppercase() == "EX" => {
+                                                let now = Instant::now();
+                                                let expires_at = now
+                                                    + Duration::from_secs(seconds.parse().unwrap());
+
+                                                let redis_value = RedisValue::new(
+                                                    ValueType::String(value.to_string()),
+                                                    Some(expires_at),
+                                                );
+                                                {
+                                                    let mut db = db.lock().unwrap();
+                                                    db.insert(key.to_string(), redis_value);
+                                                }
+
+                                                RespValue::SimpleString("OK".to_string())
+                                            }
+                                            [option, milliseconds]
+                                                if option.to_uppercase() == "PX" =>
+                                            {
+                                                let now = Instant::now();
+                                                let expires_at = now
+                                                    + Duration::from_millis(
+                                                        milliseconds.parse().unwrap(),
+                                                    );
+
+                                                let redis_value = RedisValue::new(
+                                                    ValueType::String(value.to_string()),
+                                                    Some(expires_at),
+                                                );
+                                                {
+                                                    let mut db = db.lock().unwrap();
+                                                    db.insert(key.to_string(), redis_value);
+                                                }
+
+                                                RespValue::SimpleString("OK".to_string())
+                                            }
+                                            _ => unreachable!(),
+                                        }
+                                    }
+                                    [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
+                                        let response = {
+                                            let db = db.lock().unwrap();
+
+                                            if let Some(redis_value) = db.get(key) {
+                                                match redis_value.expires_at {
+                                                    Some(instant) => {
+                                                        if Instant::now() > instant {
+                                                            RespValue::BulkStringNull
+                                                        } else {
+                                                            match &redis_value.value {
+                                                                ValueType::String(string) => {
+                                                                    RespValue::BulkString(
+                                                                        string.to_string(),
+                                                                    )
+                                                                }
+                                                                _ => unimplemented!(),
+                                                            }
+                                                        }
+                                                    }
+                                                    None => match &redis_value.value {
+                                                        ValueType::String(string) => {
+                                                            RespValue::BulkString(
+                                                                string.to_string(),
+                                                            )
+                                                        }
+                                                        _ => unimplemented!(),
+                                                    },
+                                                }
+                                            } else {
+                                                RespValue::BulkStringNull
+                                            }
+                                        };
+
+                                        response
+                                    }
+                                    [cmd, key] if cmd.to_uppercase() == "INCR".to_string() => {
+                                        let result: Result<i64, String> = {
+                                            let mut db = db.lock().unwrap();
+
+                                            if let Some(redis_value) = db.get_mut(key) {
+                                                match &mut redis_value.value {
+                                    ValueType::String(string) => match string.parse::<i64>() {
+                                        Ok(n) => {
+                                            *string = format!("{}", n + 1);
+
+                                            Ok(n + 1)
+                                        }
+                                        Err(_) => {
+                                            Err("ERR value is not an integer or out of range"
+                                                .to_string())
+                                        }
+                                    },
+                                    _ => {
+                                        unreachable!()
+                                    }
+                                }
+                                            } else {
+                                                let redis_value = RedisValue::new(
+                                                    ValueType::String("1".to_string()),
+                                                    None,
+                                                );
+
+                                                db.insert(key.to_string(), redis_value);
+
+                                                Ok(1)
+                                            }
+                                        };
+
+                                        match result {
+                                            Ok(n) => RespValue::Integers(n),
+                                            Err(e) => RespValue::SimpleError(e),
+                                        }
+                                    }
+                                    _ => {
+                                        // TODO : implement other command cases as well
+                                        unimplemented!()
+                                    }
+                                };
+
+                                responses.push(response);
+                            }
 
                             let _ = wr
-                                .write_all(encode(RespValue::Array(vec![])).as_bytes())
+                                .write_all(encode(RespValue::Array(responses)).as_bytes())
                                 .await;
 
                             in_multi = false;
