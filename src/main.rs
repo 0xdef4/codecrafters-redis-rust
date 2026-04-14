@@ -38,6 +38,7 @@ async fn main() {
 
 async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
     let mut in_multi: bool = false;
+    let mut queue: Vec<Vec<String>> = Vec::new();
 
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -49,12 +50,19 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
             Ok(0) => break,
             Ok(n) => {
                 let received = String::from_utf8_lossy(&buf[..n]);
-
                 println!("received: {:?}", received);
-
                 let resp_array = decode_arrays(&received);
-
                 println!("resp_array: {:?}", resp_array);
+
+                let cmd_upper = resp_array[0].to_uppercase();
+
+                if in_multi && cmd_upper != "EXEC" && cmd_upper != "MULTI" {
+                    queue.push(resp_array.clone());
+                    let _ = wr
+                        .write_all(encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes())
+                        .await;
+                    continue;
+                }
 
                 match resp_array.as_slice() {
                     [cmd] if cmd.to_uppercase() == "PING".to_string() => {
