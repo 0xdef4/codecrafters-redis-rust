@@ -1149,6 +1149,28 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 .await;
                         }
                     }
+                    [cmd] if cmd.to_uppercase() == "DISCARD".to_string() => {
+                        if in_multi {
+                            // empty queued vector
+                            queue = Vec::new();
+
+                            in_multi = false;
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::SimpleString("OK".to_string())).as_bytes(),
+                                )
+                                .await;
+                        } else {
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::SimpleError(
+                                        "ERR DISCARD without MULTI".to_string(),
+                                    ))
+                                    .as_bytes(),
+                                )
+                                .await;
+                        }
+                    }
                     _ => unreachable!(),
                 }
             }
