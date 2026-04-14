@@ -38,7 +38,7 @@ async fn main() {
 
 async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
     let mut in_multi: bool = false;
-    let mut queue: Vec<Vec<String>> = Vec::new();
+    let mut command_queue: Vec<Vec<String>> = Vec::new();
 
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -58,7 +58,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
 
                 if in_multi && cmd_upper != "EXEC" && cmd_upper != "MULTI" && cmd_upper != "DISCARD"
                 {
-                    queue.push(resp_array.clone());
+                    command_queue.push(resp_array.clone());
                     let _ = wr
                         .write_all(encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes())
                         .await;
@@ -993,7 +993,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                         let mut responses = Vec::new();
 
                         if in_multi {
-                            for command in &queue {
+                            for command in &command_queue {
                                 let response: RespValue = match command.as_slice() {
                                     [cmd, key, value, optional_args @ ..]
                                         if cmd.to_uppercase() == "SET".to_string() =>
@@ -1149,8 +1149,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     }
                     [cmd] if cmd.to_uppercase() == "DISCARD".to_string() => {
                         if in_multi {
-                            // empty queued vector
-                            queue = Vec::new();
+                            command_queue = Vec::new();
 
                             in_multi = false;
                             let _ = wr
