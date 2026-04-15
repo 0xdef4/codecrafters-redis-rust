@@ -5,6 +5,7 @@ use tokio::sync::Notify;
 use tokio::time::timeout;
 
 use std::collections::HashMap;
+use std::env::args;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -16,7 +17,20 @@ use resp::*;
 
 #[tokio::main]
 async fn main() {
-    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
+    let addr = {
+        let args = args().collect::<Vec<_>>();
+
+        let port_number = match &args[1..] {
+            [port_option, port_number] if port_option == "--port" => {
+                port_number.parse::<u64>().unwrap()
+            }
+            _ => 6379,
+        };
+
+        format!("127.0.0.1:{}", port_number)
+    };
+
+    let listener = TcpListener::bind(addr).await.unwrap();
 
     let db = Arc::new(Mutex::new(HashMap::new()));
     let notify = Arc::new(Notify::new());
