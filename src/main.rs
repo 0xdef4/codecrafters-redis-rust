@@ -1182,6 +1182,19 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                                 .await;
                         }
                     }
+                    [cmd, optional] if cmd.to_uppercase() == "INFO".to_string() => match optional {
+                        option if option.to_uppercase() == "replication".to_string() => {
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::BulkString("role:master".to_string()))
+                                        .as_bytes(),
+                                )
+                                .await;
+                        }
+                        _ => {
+                            unimplemented!()
+                        }
+                    },
                     _ => unreachable!(),
                 }
             }
