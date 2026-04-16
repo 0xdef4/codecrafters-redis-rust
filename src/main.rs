@@ -17,23 +17,36 @@ use resp::*;
 
 #[tokio::main]
 async fn main() {
-    let addr = {
-        let args = args().collect::<Vec<_>>();
+    let args: Vec<String> = std::env::args().collect();
+    let mut port = 6379u16;
+    let mut replicaof: Option<String> = None;
 
-        let port_number = match &args[1..] {
-            [port_option, port_number] if port_option == "--port" => {
-                port_number.parse::<u64>().unwrap()
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--port" => {
+                port = args[i + 1].parse::<u16>().unwrap();
+                i += 2;
             }
-            _ => 6379,
-        };
+            "--replicaof" => {
+                replicaof = Some(args[i + 1].clone());
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
 
-        format!("127.0.0.1:{}", port_number)
-    };
-
-    let listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     let db = Arc::new(Mutex::new(HashMap::new()));
     let notify = Arc::new(Notify::new());
+    let role = if replicaof.is_some() {
+        "slave"
+    } else {
+        "master"
+    };
 
     loop {
         match listener.accept().await {
@@ -42,7 +55,7 @@ async fn main() {
                 let notify = Arc::clone(&notify);
 
                 tokio::spawn(async move {
-                    handle_stream(stream, db, notify).await;
+                    handle_stream(stream, db, notify, role.to_string()).await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),
@@ -50,7 +63,7 @@ async fn main() {
     }
 }
 
-async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
+async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: String) {
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
 
@@ -1184,12 +1197,29 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>) {
                     }
                     [cmd, optional] if cmd.to_uppercase() == "INFO".to_string() => match optional {
                         option if option.to_uppercase() == "REPLICATION".to_string() => {
-                            let _ = wr
-                                .write_all(
-                                    encode(RespValue::BulkString("role:master".to_string()))
-                                        .as_bytes(),
-                                )
-                                .await;
+                            match role.as_str() {
+                                "slave" => {
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::BulkString(
+                                                "role:slave".to_string(),
+                                            ))
+                                            .as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                "master" => {
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::BulkString(
+                                                "role:master".to_string(),
+                                            ))
+                                            .as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                _ => {unreachable!()}
+                            }
                         }
                         _ => {
                             unimplemented!()
