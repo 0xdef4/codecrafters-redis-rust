@@ -1201,10 +1201,8 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                                 "slave" => {
                                     let _ = wr
                                         .write_all(
-                                            encode(RespValue::BulkString(
-                                                "role:slave".to_string(),
-                                            ))
-                                            .as_bytes(),
+                                            encode(RespValue::BulkString("role:slave".to_string()))
+                                                .as_bytes(),
                                         )
                                         .await;
                                 }
@@ -1212,13 +1210,15 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                                     let _ = wr
                                         .write_all(
                                             encode(RespValue::BulkString(
-                                                "role:master".to_string(),
+                                                "role:master\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0".to_string(),
                                             ))
                                             .as_bytes(),
                                         )
                                         .await;
                                 }
-                                _ => {unreachable!()}
+                                _ => {
+                                    unreachable!()
+                                }
                             }
                         }
                         _ => {
