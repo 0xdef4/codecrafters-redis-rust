@@ -9,6 +9,8 @@ use std::env::args;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use anyhow::Result;
+
 mod db;
 mod resp;
 
@@ -47,6 +49,20 @@ async fn main() {
     } else {
         "master"
     };
+
+    if let Some(replicaof) = replicaof {
+        let mut master_stream = TcpStream::connect(replicaof.replace(" ", ":")).await.unwrap();
+
+        master_stream
+            .write_all(
+                encode(RespValue::Array(vec![RespValue::BulkString(
+                    "PING".to_string(),
+                )]))
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+    }
 
     loop {
         match listener.accept().await {
