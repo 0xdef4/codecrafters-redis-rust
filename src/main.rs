@@ -53,7 +53,7 @@ async fn main() {
 
     if let Some(replicaof) = replicaof {
         tokio::spawn(async move {
-            if let Some((master_ip, master_port)) = replicaof.split_once(':') {
+            if let Some((master_ip, master_port)) = replicaof.split_once(' ') {
                 let master_addr = format!("{}:{}",master_ip, master_port);
                 let mut master_stream = TcpStream::connect(master_addr)
                     .await
