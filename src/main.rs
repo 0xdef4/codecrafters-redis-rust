@@ -76,7 +76,7 @@ async fn main() {
                         encode(RespValue::Array(vec![
                             RespValue::BulkString("REPLCONF".to_string()),
                             RespValue::BulkString("listening-port".to_string()),
-                            RespValue::BulkString(master_port.to_string()),
+                            RespValue::BulkString(port.to_string()),
                         ]))
                         .as_bytes(),
                     )
