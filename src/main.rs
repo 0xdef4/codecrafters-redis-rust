@@ -51,17 +51,50 @@ async fn main() {
     };
 
     if let Some(replicaof) = replicaof {
-        let mut master_stream = TcpStream::connect(replicaof.replace(" ", ":")).await.unwrap();
+        tokio::spawn(async move {
+            if let Some((_master_ip, master_port)) = replicaof.split_once(':') {
+                let mut master_stream = TcpStream::connect(replicaof.replace(" ", ":"))
+                    .await
+                    .unwrap();
 
-        master_stream
-            .write_all(
-                encode(RespValue::Array(vec![RespValue::BulkString(
-                    "PING".to_string(),
-                )]))
-                .as_bytes(),
-            )
-            .await
-            .unwrap();
+                // send PING
+                master_stream
+                    .write_all(
+                        encode(RespValue::Array(vec![RespValue::BulkString(
+                            "PING".to_string(),
+                        )]))
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+
+                // send REPLCONF listening-port <PORT>
+                master_stream
+                    .write_all(
+                        encode(RespValue::Array(vec![
+                            RespValue::BulkString("REPLCONF".to_string()),
+                            RespValue::BulkString("listening-port".to_string()),
+                            RespValue::BulkString(master_port.to_string()),
+                        ]))
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+
+                // send REPLCONF capa psync2
+                master_stream
+                    .write_all(
+                        encode(RespValue::Array(vec![
+                            RespValue::BulkString("REPLCONF".to_string()),
+                            RespValue::BulkString("capa".to_string()),
+                            RespValue::BulkString("psync2".to_string()),
+                        ]))
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+            }
+        });
     }
 
     loop {
@@ -1241,6 +1274,14 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                             unimplemented!()
                         }
                     },
+                    [cmd] if cmd.to_uppercase() == "REPLCONF".to_string() => {
+                        let _ = wr
+                            .write_all(
+                                encode(RespValue::SimpleString("OK".to_string()))
+                                    .as_bytes(),
+                            )
+                            .await;
+                    }
                     _ => unreachable!(),
                 }
             }
