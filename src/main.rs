@@ -102,6 +102,21 @@ async fn main() {
                     .unwrap();
 
                 master_stream.read(&mut buf).await.unwrap();
+
+                // send PSYNC <replication_id> <offset>
+                master_stream
+                    .write_all(
+                        encode(RespValue::Array(vec![
+                            RespValue::BulkString("PSYNC".to_string()),
+                            RespValue::BulkString("?".to_string()),
+                            RespValue::BulkString("-1".to_string()),
+                        ]))
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+
+                master_stream.read(&mut buf).await.unwrap();
             }
         });
     }
@@ -1287,6 +1302,14 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                         let _ = wr
                             .write_all(
                                 encode(RespValue::SimpleString("OK".to_string()))
+                                    .as_bytes(),
+                            )
+                            .await;
+                    },
+                    [cmd] if cmd.to_uppercase() == "PSYNC".to_string() => {
+                        let _ = wr
+                            .write_all(
+                                encode(RespValue::SimpleString("FULLRESYNC <REPL_ID> 0".to_string()))
                                     .as_bytes(),
                             )
                             .await;
