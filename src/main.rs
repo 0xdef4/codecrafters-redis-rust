@@ -70,6 +70,9 @@ async fn main() {
                     .await
                     .unwrap();
 
+                let mut buf = [0u8; 512];
+                master_stream.read(&mut buf).await.unwrap();
+
                 // send REPLCONF listening-port <PORT>
                 master_stream
                     .write_all(
@@ -83,6 +86,8 @@ async fn main() {
                     .await
                     .unwrap();
 
+                master_stream.read(&mut buf).await.unwrap();
+
                 // send REPLCONF capa psync2
                 master_stream
                     .write_all(
@@ -95,6 +100,8 @@ async fn main() {
                     )
                     .await
                     .unwrap();
+
+                master_stream.read(&mut buf).await.unwrap();
             }
         });
     }
