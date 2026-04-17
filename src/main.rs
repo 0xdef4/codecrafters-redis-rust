@@ -6,6 +6,7 @@ use tokio::time::timeout;
 
 use std::collections::HashMap;
 use std::env::args;
+use std::fmt::format;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -52,8 +53,9 @@ async fn main() {
 
     if let Some(replicaof) = replicaof {
         tokio::spawn(async move {
-            if let Some((_master_ip, master_port)) = replicaof.split_once(':') {
-                let mut master_stream = TcpStream::connect(replicaof.replace(" ", ":"))
+            if let Some((master_ip, master_port)) = replicaof.split_once(':') {
+                let master_addr = format!("{}:{}",master_ip, master_port);
+                let mut master_stream = TcpStream::connect(master_addr)
                     .await
                     .unwrap();
 
