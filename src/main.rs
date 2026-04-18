@@ -54,10 +54,8 @@ async fn main() {
     if let Some(replicaof) = replicaof {
         tokio::spawn(async move {
             if let Some((master_ip, master_port)) = replicaof.split_once(' ') {
-                let master_addr = format!("{}:{}",master_ip, master_port);
-                let mut master_stream = TcpStream::connect(master_addr)
-                    .await
-                    .unwrap();
+                let master_addr = format!("{}:{}", master_ip, master_port);
+                let mut master_stream = TcpStream::connect(master_addr).await.unwrap();
 
                 // send PING
                 master_stream
@@ -1300,19 +1298,30 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                     },
                     [cmd, rest @ ..] if cmd.to_uppercase() == "REPLCONF".to_string() => {
                         let _ = wr
-                            .write_all(
-                                encode(RespValue::SimpleString("OK".to_string()))
-                                    .as_bytes(),
-                            )
+                            .write_all(encode(RespValue::SimpleString("OK".to_string())).as_bytes())
                             .await;
-                    },
+                    }
                     [cmd, rest @ ..] if cmd.to_uppercase() == "PSYNC".to_string() => {
+                        // It acknowledges with a FULLRESYNC response
                         let _ = wr
                             .write_all(
-                                encode(RespValue::SimpleString("FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0".to_string()))
-                                    .as_bytes(),
+                                encode(RespValue::SimpleString(
+                                    "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"
+                                        .to_string(),
+                                ))
+                                .as_bytes(),
                             )
                             .await;
+
+                        // It sends a snapshot of its current state as an RDB file.
+                        // empty RDB
+                        // 1. RDB header (length)
+                        let rdb = hex::decode("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2").unwrap();
+                        let header = format!("${}\r\n", rdb.len());
+                        let _ = wr.write_all(header.as_bytes()).await;
+
+                        // 2. RDB binary (without the trailing \r\n)
+                        let _ = wr.write_all(&rdb).await;
                     }
                     _ => unreachable!(),
                 }
