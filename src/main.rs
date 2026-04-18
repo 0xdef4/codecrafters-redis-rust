@@ -1309,7 +1309,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                     [cmd, rest @ ..] if cmd.to_uppercase() == "PSYNC".to_string() => {
                         let _ = wr
                             .write_all(
-                                encode(RespValue::SimpleString("FULLRESYNC <REPL_ID> 0".to_string()))
+                                encode(RespValue::SimpleString("FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0".to_string()))
                                     .as_bytes(),
                             )
                             .await;
