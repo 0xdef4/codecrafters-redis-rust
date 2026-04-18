@@ -1298,7 +1298,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                             unimplemented!()
                         }
                     },
-                    [cmd] if cmd.to_uppercase() == "REPLCONF".to_string() => {
+                    [cmd, rest @ ..] if cmd.to_uppercase() == "REPLCONF".to_string() => {
                         let _ = wr
                             .write_all(
                                 encode(RespValue::SimpleString("OK".to_string()))
@@ -1306,7 +1306,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                             )
                             .await;
                     },
-                    [cmd] if cmd.to_uppercase() == "PSYNC".to_string() => {
+                    [cmd, rest @ ..] if cmd.to_uppercase() == "PSYNC".to_string() => {
                         let _ = wr
                             .write_all(
                                 encode(RespValue::SimpleString("FULLRESYNC <REPL_ID> 0".to_string()))
