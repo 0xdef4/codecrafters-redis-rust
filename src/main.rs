@@ -1,7 +1,8 @@
 #![allow(unused_imports)]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::Notify;
+use tokio::sync::{Notify, Mutex as TokioMutex};
 use tokio::time::timeout;
 
 use std::collections::HashMap;
@@ -17,6 +18,8 @@ mod resp;
 
 use db::*;
 use resp::*;
+
+pub type ReplicaWriters = Arc<TokioMutex<Vec<OwnedWriteHalf>>>;
 
 #[tokio::main]
 async fn main() {
@@ -50,6 +53,9 @@ async fn main() {
     } else {
         "master"
     };
+
+    // replica_writers 공유 상태
+    let replica_writers: ReplicaWriters = Arc::new(TokioMutex::new(Vec::new()));
 
     if let Some(replicaof) = replicaof {
         tokio::spawn(async move {
@@ -124,9 +130,10 @@ async fn main() {
             Ok((stream, _addr)) => {
                 let db = Arc::clone(&db);
                 let notify = Arc::clone(&notify);
+                let replica_writers = Arc::clone(&replica_writers);
 
                 tokio::spawn(async move {
-                    handle_stream(stream, db, notify, role.to_string()).await;
+                    handle_stream(stream, db, notify, role.to_string(), replica_writers).await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),
@@ -134,7 +141,13 @@ async fn main() {
     }
 }
 
-async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: String) {
+async fn handle_stream(
+    stream: TcpStream,
+    db: Db,
+    notify: Arc<Notify>,
+    role: String,
+    replica_writers: ReplicaWriters,
+) {
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
 
@@ -231,6 +244,14 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                                     .await;
                             }
                             _ => unreachable!(),
+                        }
+
+                        let command_to_propagate = RespValue::Array(
+                            resp_array.iter().map(|e| RespValue::BulkString(e.clone())).collect::<Vec<_>>()
+                        );
+                        let mut replica_writers = replica_writers.lock().await;
+                        for replica_writer in replica_writers.iter_mut() {
+                            let _ = replica_writer.write_all(encode(command_to_propagate.clone()).as_bytes()).await;
                         }
                     }
                     [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
@@ -1302,7 +1323,7 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                             .await;
                     }
                     [cmd, rest @ ..] if cmd.to_uppercase() == "PSYNC".to_string() => {
-                        // It acknowledges with a FULLRESYNC response
+                        // 1. It acknowledges with a FULLRESYNC response
                         let _ = wr
                             .write_all(
                                 encode(RespValue::SimpleString(
@@ -1313,15 +1334,19 @@ async fn handle_stream(stream: TcpStream, db: Db, notify: Arc<Notify>, role: Str
                             )
                             .await;
 
-                        // It sends a snapshot of its current state as an RDB file.
-                        // empty RDB
-                        // 1. RDB header (length)
+                        // 2. It sends a snapshot of its current state as an RDB file.(initially an empty RDB)
+                        // 2-1. RDB header (length)
                         let rdb = hex::decode("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2").unwrap();
                         let header = format!("${}\r\n", rdb.len());
                         let _ = wr.write_all(header.as_bytes()).await;
 
-                        // 2. RDB binary (without the trailing \r\n)
+                        // 2-2. RDB binary (without the trailing \r\n)
                         let _ = wr.write_all(&rdb).await;
+
+                        // 3. save write half of handshake stream to shared
+                        let mut replica_writers = replica_writers.lock().await;
+                        replica_writers.push(wr);
+                        return;
                     }
                     _ => unreachable!(),
                 }

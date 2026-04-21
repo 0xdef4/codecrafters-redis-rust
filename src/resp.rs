@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+#[derive(Clone)]
 pub enum RespValue {
     // RESP2
     SimpleString(String),
