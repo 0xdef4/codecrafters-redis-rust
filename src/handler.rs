@@ -33,7 +33,6 @@ pub async fn handle_stream(
             Ok(n) => {
                 let received = String::from_utf8_lossy(&buf[..n]);
                 println!("received: {:?}", received);
-                // let resp_array = decode_arrays(&received);
 
                 let commands = decode_arrays(&received);
                 for resp_array in commands {

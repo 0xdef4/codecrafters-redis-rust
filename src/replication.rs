@@ -106,7 +106,6 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                 Ok(n) => {
                     let received = String::from_utf8_lossy(&buf[..n]);
                     println!("received (in replica): {:?}", received);
-                    // let resp_array = decode_arrays(&received);
 
                     let commands = decode_arrays(&received);
                     for resp_array in commands {
