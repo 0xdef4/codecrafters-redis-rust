@@ -187,32 +187,47 @@ pub fn encode_null_array() -> String {
     format!("*-1\r\n")
 }
 
-/// RESP decode arrays'
+/// RESP decode arrays
 ///
 /// # Examples
 ///
-/// So the following,
+/// So the following input with two commands,
 ///
 /// ```text
-/// *2\r\n $4\r\nECHO\r\n $3\r\nhey\r\n
+/// *3\r\n $3\r\nSET\r\n $3\r\nfoo\r\n $3\r\n123\r\n *3\r\n $3\r\nSET\r\n $3\r\nbar\r\n $3\r\n456\r\n
 /// ```
+/// *3, $3, SET,  $3, foo,  $3, 123,      *3,  $3, SET,  $3, bar,  $3, 456
+///
 ///
 /// is decoded to,
 ///
 /// ```text
-/// ["ECHO", "hey"]
+/// [["SET", "foo", "123"], ["SET", "bar", "456"]]
 /// ```
-pub fn decode_arrays(input: &str) -> Vec<String> {
+pub fn decode_arrays(input: &str) -> Vec<Vec<String>> {
     let parts: Vec<&str> = input.split("\r\n").filter(|e| !e.is_empty()).collect();
 
-    let mut result = Vec::new();
-    let mut i = 1; // *N 헤더 스킵
+    let mut commands = Vec::new();
+    let mut i = 0;
 
     while i < parts.len() {
-        // $N 헤더 스킵, 다음 라인이 실제 값
-        result.push(parts[i + 1].to_string());
-        i += 2;
+        if parts[i].starts_with('*') {
+            let num_elements: usize = parts[i][1..].parse().unwrap();
+            i += 1;
+
+            let mut inner = Vec::new();
+            for _ in 0..num_elements {
+                if i + 1 < parts.len() {
+                    // $N 헤더 스킵, 다음이 실제 값
+                    inner.push(parts[i + 1].to_string());
+                    i += 2;
+                }
+            }
+            commands.push(inner);
+        } else {
+            i += 1;
+        }
     }
 
-    result
+    commands
 }

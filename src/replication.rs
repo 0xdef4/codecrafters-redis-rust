@@ -106,49 +106,54 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                 Ok(n) => {
                     let received = String::from_utf8_lossy(&buf[..n]);
                     println!("received (in replica): {:?}", received);
-                    let resp_array = decode_arrays(&received);
-                    println!("resp_array (in replica): {:?}", resp_array);
+                    // let resp_array = decode_arrays(&received);
 
-                    match resp_array.as_slice() {
-                        [cmd, key, value, optional_args @ ..]
-                            if cmd.to_uppercase() == "SET".to_string() =>
-                        {
-                            match optional_args {
-                                [] => {
-                                    let redis_value =
-                                        RedisValue::new(ValueType::String(value.to_string()), None);
+                    let commands = decode_arrays(&received);
+                    for resp_array in commands {
+                        println!("resp_array (in replica): {:?}", resp_array);
+                        match resp_array.as_slice() {
+                            [cmd, key, value, optional_args @ ..]
+                                if cmd.to_uppercase() == "SET".to_string() =>
+                            {
+                                match optional_args {
+                                    [] => {
+                                        let redis_value = RedisValue::new(
+                                            ValueType::String(value.to_string()),
+                                            None,
+                                        );
 
-                                    let mut db = db.lock().unwrap();
-                                    db.insert(key.to_string(), redis_value);
+                                        let mut db = db.lock().unwrap();
+                                        db.insert(key.to_string(), redis_value);
+                                    }
+                                    [option, seconds] if option.to_uppercase() == "EX" => {
+                                        let now = Instant::now();
+                                        let expires_at =
+                                            now + Duration::from_secs(seconds.parse().unwrap());
+
+                                        let redis_value = RedisValue::new(
+                                            ValueType::String(value.to_string()),
+                                            Some(expires_at),
+                                        );
+                                        let mut db = db.lock().unwrap();
+                                        db.insert(key.to_string(), redis_value);
+                                    }
+                                    [option, milliseconds] if option.to_uppercase() == "PX" => {
+                                        let now = Instant::now();
+                                        let expires_at = now
+                                            + Duration::from_millis(milliseconds.parse().unwrap());
+
+                                        let redis_value = RedisValue::new(
+                                            ValueType::String(value.to_string()),
+                                            Some(expires_at),
+                                        );
+                                        let mut db = db.lock().unwrap();
+                                        db.insert(key.to_string(), redis_value);
+                                    }
+                                    _ => unreachable!(),
                                 }
-                                [option, seconds] if option.to_uppercase() == "EX" => {
-                                    let now = Instant::now();
-                                    let expires_at =
-                                        now + Duration::from_secs(seconds.parse().unwrap());
-
-                                    let redis_value = RedisValue::new(
-                                        ValueType::String(value.to_string()),
-                                        Some(expires_at),
-                                    );
-                                    let mut db = db.lock().unwrap();
-                                    db.insert(key.to_string(), redis_value);
-                                }
-                                [option, milliseconds] if option.to_uppercase() == "PX" => {
-                                    let now = Instant::now();
-                                    let expires_at =
-                                        now + Duration::from_millis(milliseconds.parse().unwrap());
-
-                                    let redis_value = RedisValue::new(
-                                        ValueType::String(value.to_string()),
-                                        Some(expires_at),
-                                    );
-                                    let mut db = db.lock().unwrap();
-                                    db.insert(key.to_string(), redis_value);
-                                }
-                                _ => unreachable!(),
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
                 Err(_) => break,
