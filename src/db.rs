@@ -1,8 +1,6 @@
-#![allow(unused)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 use crate::resp::RespValue;
 
@@ -41,6 +39,8 @@ impl StreamEntry {
     }
 }
 
+
+#[allow(unused)]
 pub enum ValueType {
     String(String),
     List(Vec<String>),

@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 #[derive(Clone)]
 pub enum RespValue {
     // RESP2
@@ -11,6 +9,7 @@ pub enum RespValue {
     Array(Vec<RespValue>),
     ArrayNull,
 
+    #[allow(unused)]
     // RESP3
     Null,
 }
@@ -39,6 +38,7 @@ pub fn encode(input: RespValue) -> String {
     }
 }
 
+
 /// RESP encode simple strings
 ///
 /// Simple strings are encoded as a plus (+) character, followed by a string. The string mustn't contain a CR (\r) or LF (\n) character and is terminated by CRLF (i.e., \r\n).
@@ -51,11 +51,13 @@ pub fn encode(input: RespValue) -> String {
 ///
 /// When Redis replies with a simple string, a client library should return to the caller a string value composed of the first character after the + up to the end of the string, excluding the final CRLF bytes.
 /// To send binary strings, use bulk strings instead.
+#[allow(unused)]
 pub fn encode_simple_strings(input: String) -> String {
     format!("+{}\r\n", input)
 }
 
 /// RESP decode simple strings
+#[allow(unused)]
 pub fn decode_simple_strings(input: String) -> String {
     input
         .trim_end_matches("\r\n")
@@ -81,6 +83,7 @@ pub fn decode_simple_strings(input: String) -> String {
 /// -WRONGTYPE Operation against a key holding the wrong kind of value
 /// ```
 ///
+#[allow(unused)]
 pub fn encode_simple_errors(error_msg: String) -> String {
     format!("-{}\r\n", error_msg)
 }
@@ -95,11 +98,13 @@ pub fn encode_simple_errors(error_msg: String) -> String {
 /// ```
 ///
 /// For example, :0\r\n and :1000\r\n are integer replies (of zero and one thousand, respectively).
+#[allow(unused)]
 pub fn encode_integers(input: i64) -> String {
     format!(":{}\r\n", input)
 }
 
 /// RESP decode integers
+#[allow(unused)]
 pub fn decode_integers(_input: String) -> i64 {
     todo!()
 }
@@ -127,6 +132,7 @@ pub fn decode_integers(_input: String) -> i64 {
 /// ```text
 /// $5\r\nhello\r\n
 /// ```
+#[allow(unused)]
 pub fn encode_bulk_strings(input: String) -> String {
     if input.is_empty() {
         format!("$-1\r\n")
@@ -136,6 +142,7 @@ pub fn encode_bulk_strings(input: String) -> String {
 }
 
 /// RESP decode bulk strings
+#[allow(unused)]
 pub fn decode_bulk_strings(_input: String) -> String {
     todo!()
 }
@@ -161,6 +168,7 @@ pub fn decode_bulk_strings(_input: String) -> String {
 /// ```text
 /// *2\r\n$5\r\nhello\r\n$5\r\nworld\r\n
 /// ```
+#[allow(unused)]
 pub fn encode_arrays(arr: &[&str]) -> String {
     let mut output = String::new();
     output.push_str("*");
@@ -175,6 +183,7 @@ pub fn encode_arrays(arr: &[&str]) -> String {
 }
 
 /// encode null array
+#[allow(unused)]
 pub fn encode_null_array() -> String {
     format!("*-1\r\n")
 }

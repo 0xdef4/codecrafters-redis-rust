@@ -1,22 +1,21 @@
-#![allow(unused_imports)]
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Notify, Mutex as TokioMutex};
+use tokio::sync::{Mutex as TokioMutex, Notify};
 use tokio::time::timeout;
 
 use std::collections::HashMap;
-use std::env::args;
-use std::fmt::format;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
 mod db;
+mod replication;
 mod resp;
 
 use db::*;
+use replication::*;
 use resp::*;
 
 pub type ReplicaWriters = Arc<TokioMutex<Vec<OwnedWriteHalf>>>;
@@ -59,69 +58,7 @@ async fn main() {
 
     if let Some(replicaof) = replicaof {
         tokio::spawn(async move {
-            if let Some((master_ip, master_port)) = replicaof.split_once(' ') {
-                let master_addr = format!("{}:{}", master_ip, master_port);
-                let mut master_stream = TcpStream::connect(master_addr).await.unwrap();
-
-                // send PING
-                master_stream
-                    .write_all(
-                        encode(RespValue::Array(vec![RespValue::BulkString(
-                            "PING".to_string(),
-                        )]))
-                        .as_bytes(),
-                    )
-                    .await
-                    .unwrap();
-
-                let mut buf = [0u8; 512];
-                master_stream.read(&mut buf).await.unwrap();
-
-                // send REPLCONF listening-port <PORT>
-                master_stream
-                    .write_all(
-                        encode(RespValue::Array(vec![
-                            RespValue::BulkString("REPLCONF".to_string()),
-                            RespValue::BulkString("listening-port".to_string()),
-                            RespValue::BulkString(port.to_string()),
-                        ]))
-                        .as_bytes(),
-                    )
-                    .await
-                    .unwrap();
-
-                master_stream.read(&mut buf).await.unwrap();
-
-                // send REPLCONF capa psync2
-                master_stream
-                    .write_all(
-                        encode(RespValue::Array(vec![
-                            RespValue::BulkString("REPLCONF".to_string()),
-                            RespValue::BulkString("capa".to_string()),
-                            RespValue::BulkString("psync2".to_string()),
-                        ]))
-                        .as_bytes(),
-                    )
-                    .await
-                    .unwrap();
-
-                master_stream.read(&mut buf).await.unwrap();
-
-                // send PSYNC <replication_id> <offset>
-                master_stream
-                    .write_all(
-                        encode(RespValue::Array(vec![
-                            RespValue::BulkString("PSYNC".to_string()),
-                            RespValue::BulkString("?".to_string()),
-                            RespValue::BulkString("-1".to_string()),
-                        ]))
-                        .as_bytes(),
-                    )
-                    .await
-                    .unwrap();
-
-                master_stream.read(&mut buf).await.unwrap();
-            }
+            start_replica_handshake(replicaof, port).await;
         });
     }
 
@@ -247,11 +184,16 @@ async fn handle_stream(
                         }
 
                         let command_to_propagate = RespValue::Array(
-                            resp_array.iter().map(|e| RespValue::BulkString(e.clone())).collect::<Vec<_>>()
+                            resp_array
+                                .iter()
+                                .map(|e| RespValue::BulkString(e.clone()))
+                                .collect::<Vec<_>>(),
                         );
                         let mut replica_writers = replica_writers.lock().await;
                         for replica_writer in replica_writers.iter_mut() {
-                            let _ = replica_writer.write_all(encode(command_to_propagate.clone()).as_bytes()).await;
+                            let _ = replica_writer
+                                .write_all(encode(command_to_propagate.clone()).as_bytes())
+                                .await;
                         }
                     }
                     [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
