@@ -49,8 +49,10 @@ async fn main() {
     let replica_writers: ReplicaWriters = Arc::new(TokioMutex::new(Vec::new()));
 
     if let Some(replicaof) = replicaof {
+        let db = Arc::clone(&db);
+
         tokio::spawn(async move {
-            start_replica_handshake(replicaof, port).await;
+            start_replica_handshake(replicaof, port, db).await;
         });
     }
 

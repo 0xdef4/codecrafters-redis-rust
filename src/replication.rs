@@ -4,13 +4,13 @@ use tokio::net::tcp::OwnedWriteHalf;
 use tokio::sync::Mutex as TokioMutex;
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use crate::RespValue;
-use crate::encode;
+use crate::{Db, RedisValue, RespValue, ValueType, decode_arrays, encode};
 
 pub type ReplicaWriters = Arc<TokioMutex<Vec<OwnedWriteHalf>>>;
 
-pub async fn start_replica_handshake(replicaof: String, port: u16) {
+pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
     if let Some((master_ip, master_port)) = replicaof.split_once(' ') {
         let master_addr = format!("{}:{}", master_ip, master_port);
         let mut master_stream = TcpStream::connect(master_addr).await.unwrap();
@@ -72,6 +72,87 @@ pub async fn start_replica_handshake(replicaof: String, port: u16) {
             .await
             .unwrap();
 
-        master_stream.read(&mut buf).await.unwrap();
+        // wait for FULLRESYNC response
+        let mut line = String::new();
+        loop {
+            let b = master_stream.read_u8().await.unwrap();
+            line.push(b as char);
+            if line.ends_with("\r\n") {
+                break;
+            }
+        }
+        // println!("FULLRESYNC: {}", line);
+
+        // read RDB header: $<len>\r\n
+        let mut rdb_header = String::new();
+        loop {
+            let b = master_stream.read_u8().await.unwrap();
+            rdb_header.push(b as char);
+            if rdb_header.ends_with("\r\n") {
+                break;
+            }
+        }
+        // parse RDB header for RDB length: "$88\r\n" -> 88 파싱
+        let rdb_len: usize = rdb_header.trim_start_matches('$').trim().parse().unwrap();
+
+        // wait for RDB binary using exact length
+        let mut rdb_buf = vec![0u8; rdb_len];
+        master_stream.read_exact(&mut rdb_buf).await.unwrap();
+        // println!("RDB read: {} bytes", rdb_len);
+
+        loop {
+            match master_stream.read(&mut buf).await {
+                Ok(0) => break,
+                Ok(n) => {
+                    let received = String::from_utf8_lossy(&buf[..n]);
+                    println!("received (in replica): {:?}", received);
+                    let resp_array = decode_arrays(&received);
+                    println!("resp_array (in replica): {:?}", resp_array);
+
+                    match resp_array.as_slice() {
+                        [cmd, key, value, optional_args @ ..]
+                            if cmd.to_uppercase() == "SET".to_string() =>
+                        {
+                            match optional_args {
+                                [] => {
+                                    let redis_value =
+                                        RedisValue::new(ValueType::String(value.to_string()), None);
+
+                                    let mut db = db.lock().unwrap();
+                                    db.insert(key.to_string(), redis_value);
+                                }
+                                [option, seconds] if option.to_uppercase() == "EX" => {
+                                    let now = Instant::now();
+                                    let expires_at =
+                                        now + Duration::from_secs(seconds.parse().unwrap());
+
+                                    let redis_value = RedisValue::new(
+                                        ValueType::String(value.to_string()),
+                                        Some(expires_at),
+                                    );
+                                    let mut db = db.lock().unwrap();
+                                    db.insert(key.to_string(), redis_value);
+                                }
+                                [option, milliseconds] if option.to_uppercase() == "PX" => {
+                                    let now = Instant::now();
+                                    let expires_at =
+                                        now + Duration::from_millis(milliseconds.parse().unwrap());
+
+                                    let redis_value = RedisValue::new(
+                                        ValueType::String(value.to_string()),
+                                        Some(expires_at),
+                                    );
+                                    let mut db = db.lock().unwrap();
+                                    db.insert(key.to_string(), redis_value);
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Err(_) => break,
+            }
+        }
     }
 }

@@ -117,17 +117,20 @@ pub async fn handle_stream(
                             _ => unreachable!(),
                         }
 
-                        let command_to_propagate = RespValue::Array(
-                            resp_array
-                                .iter()
-                                .map(|e| RespValue::BulkString(e.clone()))
-                                .collect::<Vec<_>>(),
-                        );
-                        let mut replica_writers = replica_writers.lock().await;
-                        for replica_writer in replica_writers.iter_mut() {
-                            let _ = replica_writer
-                                .write_all(encode(command_to_propagate.clone()).as_bytes())
-                                .await;
+                        if role == "master" {
+                            let command_to_propagate = RespValue::Array(
+                                resp_array
+                                    .iter()
+                                    .map(|e| RespValue::BulkString(e.clone()))
+                                    .collect::<Vec<_>>(),
+                            );
+
+                            let mut replica_writers = replica_writers.lock().await;
+                            for replica_writer in replica_writers.iter_mut() {
+                                let _ = replica_writer
+                                    .write_all(encode(command_to_propagate.clone()).as_bytes())
+                                    .await;
+                            }
                         }
                     }
                     [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
