@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Instant};
+use std::time::Instant;
 
 use crate::resp::RespValue;
 
@@ -38,7 +38,6 @@ impl StreamEntry {
         RespValue::Array(output)
     }
 }
-
 
 #[allow(unused)]
 pub enum ValueType {

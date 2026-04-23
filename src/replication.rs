@@ -1,8 +1,14 @@
-use tokio::net::{TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::net::tcp::OwnedWriteHalf;
+use tokio::sync::Mutex as TokioMutex;
+
+use std::sync::Arc;
 
 use crate::RespValue;
 use crate::encode;
+
+pub type ReplicaWriters = Arc<TokioMutex<Vec<OwnedWriteHalf>>>;
 
 pub async fn start_replica_handshake(replicaof: String, port: u16) {
     if let Some((master_ip, master_port)) = replicaof.split_once(' ') {

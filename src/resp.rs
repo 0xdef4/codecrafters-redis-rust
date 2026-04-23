@@ -38,7 +38,6 @@ pub fn encode(input: RespValue) -> String {
     }
 }
 
-
 /// RESP encode simple strings
 ///
 /// Simple strings are encoded as a plus (+) character, followed by a string. The string mustn't contain a CR (\r) or LF (\n) character and is terminated by CRLF (i.e., \r\n).
