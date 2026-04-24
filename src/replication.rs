@@ -151,6 +151,22 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                                     _ => unreachable!(),
                                 }
                             }
+                            [cmd, subcmd, arg]
+                                if cmd.to_uppercase() == "REPLCONF".to_string()
+                                    && subcmd.to_uppercase() == "GETACK".to_string() =>
+                            {
+                                master_stream
+                                    .write_all(
+                                        encode(RespValue::Array(vec![
+                                            RespValue::BulkString("REPLCONF".to_string()),
+                                            RespValue::BulkString("ACK".to_string()),
+                                            RespValue::BulkString("0".to_string()),
+                                        ]))
+                                        .as_bytes(),
+                                    )
+                                    .await
+                                    .unwrap();
+                            }
                             _ => {}
                         }
                     }
