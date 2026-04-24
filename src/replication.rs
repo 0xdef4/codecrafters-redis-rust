@@ -100,6 +100,9 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
         master_stream.read_exact(&mut rdb_buf).await.unwrap();
         // println!("RDB read: {} bytes", rdb_len);
 
+        // track total byte size received from master
+        let mut track_total_bytes = 0;
+
         loop {
             match master_stream.read(&mut buf).await {
                 Ok(0) => break,
@@ -111,6 +114,27 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                     for resp_array in commands {
                         println!("resp_array (in replica): {:?}", resp_array);
                         match resp_array.as_slice() {
+                            [cmd] if cmd.to_uppercase() == "PING".to_string() => {
+                                master_stream
+                                    .write_all(
+                                        encode(RespValue::SimpleString("PONG".to_string()))
+                                            .as_bytes(),
+                                    )
+                                    .await
+                                    .unwrap();
+
+                                // calculate the byte size of the command
+                                let byte_size_of_command = encode(RespValue::Array(
+                                    resp_array
+                                        .iter()
+                                        .map(|e| RespValue::BulkString(e.to_string()))
+                                        .collect::<Vec<_>>(),
+                                ))
+                                .as_bytes()
+                                .len();
+
+                                track_total_bytes += byte_size_of_command;
+                            }
                             [cmd, key, value, optional_args @ ..]
                                 if cmd.to_uppercase() == "SET".to_string() =>
                             {
@@ -150,6 +174,18 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                                     }
                                     _ => unreachable!(),
                                 }
+
+                                // calculate the byte size of the command
+                                let byte_size_of_command = encode(RespValue::Array(
+                                    resp_array
+                                        .iter()
+                                        .map(|e| RespValue::BulkString(e.to_string()))
+                                        .collect::<Vec<_>>(),
+                                ))
+                                .as_bytes()
+                                .len();
+
+                                track_total_bytes += byte_size_of_command;
                             }
                             [cmd, subcmd, arg]
                                 if cmd.to_uppercase() == "REPLCONF".to_string()
@@ -160,12 +196,24 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                                         encode(RespValue::Array(vec![
                                             RespValue::BulkString("REPLCONF".to_string()),
                                             RespValue::BulkString("ACK".to_string()),
-                                            RespValue::BulkString("0".to_string()),
+                                            RespValue::BulkString(track_total_bytes.to_string()),
                                         ]))
                                         .as_bytes(),
                                     )
                                     .await
                                     .unwrap();
+
+                                // calculate the byte size of the command
+                                let byte_size_of_command = encode(RespValue::Array(
+                                    resp_array
+                                        .iter()
+                                        .map(|e| RespValue::BulkString(e.to_string()))
+                                        .collect::<Vec<_>>(),
+                                ))
+                                .as_bytes()
+                                .len();
+
+                                track_total_bytes += byte_size_of_command;
                             }
                             _ => {}
                         }
@@ -176,3 +224,5 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
         }
     }
 }
+
+// TODO : redo byte parsing
