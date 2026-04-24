@@ -115,14 +115,6 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                         println!("resp_array (in replica): {:?}", resp_array);
                         match resp_array.as_slice() {
                             [cmd] if cmd.to_uppercase() == "PING".to_string() => {
-                                master_stream
-                                    .write_all(
-                                        encode(RespValue::SimpleString("PONG".to_string()))
-                                            .as_bytes(),
-                                    )
-                                    .await
-                                    .unwrap();
-
                                 // calculate the byte size of the command
                                 let byte_size_of_command = encode(RespValue::Array(
                                     resp_array
