@@ -216,5 +216,3 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
         }
     }
 }
-
-// TODO : redo byte parsing
