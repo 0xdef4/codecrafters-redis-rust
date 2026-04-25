@@ -1275,6 +1275,20 @@ pub async fn handle_stream(
                             replica_writers.push(wr);
                             return;
                         }
+                        [cmd, numreplicas, timeout] if cmd.to_uppercase() == "WAIT".to_string() => {
+                            let replica_writers = replica_writers.lock().await;
+
+                            let number_of_replicas_connected = replica_writers.len();
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::Integers(
+                                        number_of_replicas_connected as i64,
+                                    ))
+                                    .as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
