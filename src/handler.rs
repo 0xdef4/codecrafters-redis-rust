@@ -1290,7 +1290,6 @@ pub async fn handle_stream(
                             let timeout_ms = timeout.parse::<u64>().unwrap();
 
                             let ack_count = Arc::new(Mutex::new(0usize));
-
                             let ack_count_clone = Arc::clone(&ack_count);
 
                             let _ =
@@ -1298,15 +1297,18 @@ pub async fn handle_stream(
                                     // let mut ack_count = 0usize;
                                     let mut buf = [0u8; 512];
 
-                                    for (replica_writer, replica_reader) in replicas.iter_mut() {
-                                        // send command to replica
+                                    // 1. send commands to replicas all at once first
+                                    for (replica_writer, _) in replicas.iter_mut() {
                                         let _ = replica_writer
                                             .write_all(
                                                 encode(command_to_send_to_replica.clone())
                                                     .as_bytes(),
                                             )
                                             .await;
+                                    }
 
+                                    // 2. collect the ACK responses
+                                    for (_, replica_reader) in replicas.iter_mut() {
                                         // read offset response from replica and count acknowledged replicas
                                         if let Ok(n) = replica_reader.read(&mut buf).await {
                                             let received = String::from_utf8_lossy(&buf[..n]);
@@ -1329,6 +1331,7 @@ pub async fn handle_stream(
                                             }
                                         }
                                     }
+
                                     // ack_count
                                 })
                                 .await;
