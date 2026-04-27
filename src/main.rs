@@ -46,7 +46,7 @@ async fn main() {
     } else {
         "master"
     };
-    let replica_writers: ReplicaWriters = Arc::new(TokioMutex::new(Vec::new()));
+    let replicas: Replicas = Arc::new(TokioMutex::new(Vec::new()));
 
     if let Some(replicaof) = replicaof {
         let db = Arc::clone(&db);
@@ -61,10 +61,10 @@ async fn main() {
             Ok((stream, _addr)) => {
                 let db = Arc::clone(&db);
                 let notify = Arc::clone(&notify);
-                let replica_writers = Arc::clone(&replica_writers);
+                let replicas = Arc::clone(&replicas);
 
                 tokio::spawn(async move {
-                    handle_stream(stream, db, notify, role.to_string(), replica_writers).await;
+                    handle_stream(stream, db, notify, role.to_string(), replicas).await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),

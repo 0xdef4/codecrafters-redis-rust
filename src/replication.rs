@@ -1,6 +1,6 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::net::tcp::OwnedWriteHalf;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::Mutex as TokioMutex;
 
 use std::sync::Arc;
@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::{Db, RedisValue, RespValue, ValueType, decode_arrays, encode};
 
-pub type ReplicaWriters = Arc<TokioMutex<Vec<OwnedWriteHalf>>>;
+pub type Replicas = Arc<TokioMutex<Vec<(OwnedWriteHalf, OwnedReadHalf)>>>;
 
 pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
     if let Some((master_ip, master_port)) = replicaof.split_once(' ') {
@@ -113,6 +113,7 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                     let commands = decode_arrays(&received);
                     for resp_array in commands {
                         println!("resp_array (in replica): {:?}", resp_array);
+
                         match resp_array.as_slice() {
                             [cmd] if cmd.to_uppercase() == "PING".to_string() => {
                                 // calculate the byte size of the command

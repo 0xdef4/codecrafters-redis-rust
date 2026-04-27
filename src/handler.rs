@@ -3,24 +3,24 @@ use tokio::net::TcpStream;
 use tokio::sync::Notify;
 use tokio::time::timeout;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use crate::{
-    Db, RedisValue, ReplicaWriters, RespValue, StreamEntry, ValueType, decode_arrays, encode,
-};
+use crate::{Db, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays, encode};
 
 pub async fn handle_stream(
     stream: TcpStream,
     db: Db,
     notify: Arc<Notify>,
     role: String,
-    replica_writers: ReplicaWriters,
+    replicas: Replicas,
 ) {
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
+
+    let mut master_repl_offset: usize = 0;
 
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -131,8 +131,11 @@ pub async fn handle_stream(
                                         .collect::<Vec<_>>(),
                                 );
 
-                                let mut replica_writers = replica_writers.lock().await;
-                                for replica_writer in replica_writers.iter_mut() {
+                                master_repl_offset +=
+                                    encode(command_to_propagate.clone()).as_bytes().len();
+
+                                let mut replicas = replicas.lock().await;
+                                for (replica_writer, _replica_reader) in replicas.iter_mut() {
                                     let _ = replica_writer
                                         .write_all(encode(command_to_propagate.clone()).as_bytes())
                                         .await;
@@ -1271,23 +1274,80 @@ pub async fn handle_stream(
                             let _ = wr.write_all(&rdb).await;
 
                             // 3. save write half of handshake stream to shared
-                            let mut replica_writers = replica_writers.lock().await;
-                            replica_writers.push(wr);
+                            let mut replicas = replicas.lock().await;
+                            replicas.push((wr, rd.into_inner()));
                             return;
                         }
                         [cmd, numreplicas, timeout] if cmd.to_uppercase() == "WAIT".to_string() => {
-                            let replica_writers = replica_writers.lock().await;
+                            let mut replicas = replicas.lock().await;
 
-                            let number_of_replicas_connected = replica_writers.len();
+                            let command_to_send_to_replica = RespValue::Array(vec![
+                                RespValue::BulkString("REPLCONF".to_string()),
+                                RespValue::BulkString("GETACK".to_string()),
+                                RespValue::BulkString("*".to_string()),
+                            ]);
+
+                            let timeout_ms = timeout.parse::<u64>().unwrap();
+
+                            let ack_count = Arc::new(Mutex::new(0usize));
+
+                            let ack_count_clone = Arc::clone(&ack_count);
+
+                            let _ =
+                                tokio::time::timeout(Duration::from_millis(timeout_ms), async {
+                                    // let mut ack_count = 0usize;
+                                    let mut buf = [0u8; 512];
+
+                                    for (replica_writer, replica_reader) in replicas.iter_mut() {
+                                        // send command to replica
+                                        let _ = replica_writer
+                                            .write_all(
+                                                encode(command_to_send_to_replica.clone())
+                                                    .as_bytes(),
+                                            )
+                                            .await;
+
+                                        // read offset response from replica and count acknowledged replicas
+                                        if let Ok(n) = replica_reader.read(&mut buf).await {
+                                            let received = String::from_utf8_lossy(&buf[..n]);
+                                            let commands = decode_arrays(&received);
+                                            for resp_array in commands {
+                                                // REPLCONF ACK <offset>
+                                                if let [cmd, subcmd, offset] = resp_array.as_slice()
+                                                {
+                                                    if cmd.to_uppercase() == "REPLCONF"
+                                                        && subcmd.to_uppercase() == "ACK"
+                                                    {
+                                                        let replica_offset =
+                                                            offset.parse::<usize>().unwrap_or(0);
+                                                        if replica_offset >= master_repl_offset {
+                                                            // ack_count += 1;
+                                                            *ack_count_clone.lock().unwrap() += 1;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // ack_count
+                                })
+                                .await;
+
+                            // TODO : timeout 된 경우 ack_count는 머로 할지 결정 지금 이 코드는 0으로 둠 (인공지능 마지막 답변 참조)
+                            // let ack_count = result.unwrap_or_default();
+
+                            let count = *ack_count.lock().unwrap();
 
                             let _ = wr
-                                .write_all(
-                                    encode(RespValue::Integers(
-                                        number_of_replicas_connected as i64,
-                                    ))
-                                    .as_bytes(),
-                                )
+                                .write_all(encode(RespValue::Integers(count as i64)).as_bytes())
                                 .await;
+
+                            // The WAIT command should complete when either:
+
+                            // The required number of replicas has acknowledged all previous write commands
+                            // or The timeout expires.
+
+                            // Either way, the master should return the number of replicas that acknowledged all previous write commands as a RESP integer.
                         }
                         _ => unreachable!(),
                     }
