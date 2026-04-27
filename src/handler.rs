@@ -1301,10 +1301,9 @@ pub async fn handle_stream(
                                 let _ = tokio::time::timeout(
                                     Duration::from_millis(timeout_ms),
                                     async {
-                                        // let mut ack_count = 0usize;
                                         let mut buf = [0u8; 512];
 
-                                        // 1. send commands to replicas all at once first
+                                        // 1. send GETACK command to replicas all at once
                                         for (replica_writer, _) in replicas.iter_mut() {
                                             let _ = replica_writer
                                                 .write_all(
@@ -1333,7 +1332,6 @@ pub async fn handle_stream(
                                                                 .unwrap_or(0);
                                                             if replica_offset >= master_repl_offset
                                                             {
-                                                                // ack_count += 1;
                                                                 *ack_count_clone.lock().unwrap() +=
                                                                     1;
                                                             }
@@ -1342,14 +1340,9 @@ pub async fn handle_stream(
                                                 }
                                             }
                                         }
-
-                                        // ack_count
                                     },
                                 )
                                 .await;
-
-                                // TODO : timeout 된 경우 ack_count는 머로 할지 결정 지금 이 코드는 0으로 둠 (인공지능 마지막 답변 참조)
-                                // let ack_count = result.unwrap_or_default();
 
                                 let count = *ack_count.lock().unwrap();
 
@@ -1357,13 +1350,6 @@ pub async fn handle_stream(
                                     .write_all(encode(RespValue::Integers(count as i64)).as_bytes())
                                     .await;
                             }
-
-                            // The WAIT command should complete when either:
-
-                            // The required number of replicas has acknowledged all previous write commands
-                            // or The timeout expires.
-
-                            // Either way, the master should return the number of replicas that acknowledged all previous write commands as a RESP integer.
                         }
                         _ => unreachable!(),
                     }
