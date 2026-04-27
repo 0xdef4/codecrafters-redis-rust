@@ -1281,69 +1281,82 @@ pub async fn handle_stream(
                         [cmd, numreplicas, timeout] if cmd.to_uppercase() == "WAIT".to_string() => {
                             let mut replicas = replicas.lock().await;
 
-                            let command_to_send_to_replica = RespValue::Array(vec![
-                                RespValue::BulkString("REPLCONF".to_string()),
-                                RespValue::BulkString("GETACK".to_string()),
-                                RespValue::BulkString("*".to_string()),
-                            ]);
+                            if master_repl_offset == 0 {
+                                let count = replicas.len();
+                                let _ = wr
+                                    .write_all(encode(RespValue::Integers(count as i64)).as_bytes())
+                                    .await;
+                            } else {
+                                let command_to_send_to_replica = RespValue::Array(vec![
+                                    RespValue::BulkString("REPLCONF".to_string()),
+                                    RespValue::BulkString("GETACK".to_string()),
+                                    RespValue::BulkString("*".to_string()),
+                                ]);
 
-                            let timeout_ms = timeout.parse::<u64>().unwrap();
+                                let timeout_ms = timeout.parse::<u64>().unwrap();
 
-                            let ack_count = Arc::new(Mutex::new(0usize));
-                            let ack_count_clone = Arc::clone(&ack_count);
+                                let ack_count = Arc::new(Mutex::new(0usize));
+                                let ack_count_clone = Arc::clone(&ack_count);
 
-                            let _ =
-                                tokio::time::timeout(Duration::from_millis(timeout_ms), async {
-                                    // let mut ack_count = 0usize;
-                                    let mut buf = [0u8; 512];
+                                let _ = tokio::time::timeout(
+                                    Duration::from_millis(timeout_ms),
+                                    async {
+                                        // let mut ack_count = 0usize;
+                                        let mut buf = [0u8; 512];
 
-                                    // 1. send commands to replicas all at once first
-                                    for (replica_writer, _) in replicas.iter_mut() {
-                                        let _ = replica_writer
-                                            .write_all(
-                                                encode(command_to_send_to_replica.clone())
-                                                    .as_bytes(),
-                                            )
-                                            .await;
-                                    }
+                                        // 1. send commands to replicas all at once first
+                                        for (replica_writer, _) in replicas.iter_mut() {
+                                            let _ = replica_writer
+                                                .write_all(
+                                                    encode(command_to_send_to_replica.clone())
+                                                        .as_bytes(),
+                                                )
+                                                .await;
+                                        }
 
-                                    // 2. collect the ACK responses
-                                    for (_, replica_reader) in replicas.iter_mut() {
-                                        // read offset response from replica and count acknowledged replicas
-                                        if let Ok(n) = replica_reader.read(&mut buf).await {
-                                            let received = String::from_utf8_lossy(&buf[..n]);
-                                            let commands = decode_arrays(&received);
-                                            for resp_array in commands {
-                                                // REPLCONF ACK <offset>
-                                                if let [cmd, subcmd, offset] = resp_array.as_slice()
-                                                {
-                                                    if cmd.to_uppercase() == "REPLCONF"
-                                                        && subcmd.to_uppercase() == "ACK"
+                                        // 2. collect the ACK responses
+                                        for (_, replica_reader) in replicas.iter_mut() {
+                                            // read offset response from replica and count acknowledged replicas
+                                            if let Ok(n) = replica_reader.read(&mut buf).await {
+                                                let received = String::from_utf8_lossy(&buf[..n]);
+                                                let commands = decode_arrays(&received);
+                                                for resp_array in commands {
+                                                    // REPLCONF ACK <offset>
+                                                    if let [cmd, subcmd, offset] =
+                                                        resp_array.as_slice()
                                                     {
-                                                        let replica_offset =
-                                                            offset.parse::<usize>().unwrap_or(0);
-                                                        if replica_offset >= master_repl_offset {
-                                                            // ack_count += 1;
-                                                            *ack_count_clone.lock().unwrap() += 1;
+                                                        if cmd.to_uppercase() == "REPLCONF"
+                                                            && subcmd.to_uppercase() == "ACK"
+                                                        {
+                                                            let replica_offset = offset
+                                                                .parse::<usize>()
+                                                                .unwrap_or(0);
+                                                            if replica_offset >= master_repl_offset
+                                                            {
+                                                                // ack_count += 1;
+                                                                *ack_count_clone.lock().unwrap() +=
+                                                                    1;
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    // ack_count
-                                })
+                                        // ack_count
+                                    },
+                                )
                                 .await;
 
-                            // TODO : timeout 된 경우 ack_count는 머로 할지 결정 지금 이 코드는 0으로 둠 (인공지능 마지막 답변 참조)
-                            // let ack_count = result.unwrap_or_default();
+                                // TODO : timeout 된 경우 ack_count는 머로 할지 결정 지금 이 코드는 0으로 둠 (인공지능 마지막 답변 참조)
+                                // let ack_count = result.unwrap_or_default();
 
-                            let count = *ack_count.lock().unwrap();
+                                let count = *ack_count.lock().unwrap();
 
-                            let _ = wr
-                                .write_all(encode(RespValue::Integers(count as i64)).as_bytes())
-                                .await;
+                                let _ = wr
+                                    .write_all(encode(RespValue::Integers(count as i64)).as_bytes())
+                                    .await;
+                            }
 
                             // The WAIT command should complete when either:
 
