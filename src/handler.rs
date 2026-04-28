@@ -16,6 +16,8 @@ pub async fn handle_stream(
     notify: Arc<Notify>,
     role: String,
     replicas: Replicas,
+    dir: String,
+    dbfilename: String,
 ) {
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
@@ -1349,6 +1351,39 @@ pub async fn handle_stream(
                                 let _ = wr
                                     .write_all(encode(RespValue::Integers(count as i64)).as_bytes())
                                     .await;
+                            }
+                        }
+                        [cmd, subcmd, rest @ ..]
+                            if cmd.to_uppercase() == "CONFIG".to_string()
+                                && subcmd.to_uppercase() == "GET".to_string() =>
+                        {
+                            match rest {
+                                [] => {
+                                    unimplemented!()
+                                }
+                                [val] if val == "dir" => {
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::Array(vec![
+                                                RespValue::BulkString("dir".to_string()),
+                                                RespValue::BulkString(dir.to_string()),
+                                            ]))
+                                            .as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                [val] if val == "dbfilename" => {
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::Array(vec![
+                                                RespValue::BulkString("dbfilename".to_string()),
+                                                RespValue::BulkString(dbfilename.to_string()),
+                                            ]))
+                                            .as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                _ => {}
                             }
                         }
                         _ => unreachable!(),

@@ -20,6 +20,11 @@ async fn main() {
     let mut port = 6379u16;
     let mut replicaof: Option<String> = None;
 
+    let mut dir: Option<String> = None;
+    let mut dbfilename: Option<String> = None;
+
+    // --dir /tmp/redis-files --dbfilename dump.rdb
+
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -29,6 +34,14 @@ async fn main() {
             }
             "--replicaof" => {
                 replicaof = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--dir" => {
+                dir = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--dbfilename" => {
+                dbfilename = Some(args[i + 1].clone());
                 i += 2;
             }
             _ => i += 1,
@@ -62,9 +75,20 @@ async fn main() {
                 let db = Arc::clone(&db);
                 let notify = Arc::clone(&notify);
                 let replicas = Arc::clone(&replicas);
+                let dir = dir.clone().unwrap_or_default();
+                let dbfilename = dbfilename.clone().unwrap_or_default();
 
                 tokio::spawn(async move {
-                    handle_stream(stream, db, notify, role.to_string(), replicas).await;
+                    handle_stream(
+                        stream,
+                        db,
+                        notify,
+                        role.to_string(),
+                        replicas,
+                        dir,
+                        dbfilename,
+                    )
+                    .await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),
