@@ -14,58 +14,68 @@ use handler::*;
 use replication::*;
 use resp::*;
 
+#[derive(Clone)]
+pub struct Config {
+    pub port: u16,
+    pub replicaof: Option<String>,
+    pub dir: Option<String>,
+    pub dbfilename: Option<String>,
+}
+
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let mut port = 6379u16;
-    let mut replicaof: Option<String> = None;
 
-    let mut dir: Option<String> = None;
-    let mut dbfilename: Option<String> = None;
-
-    // --dir /tmp/redis-files --dbfilename dump.rdb
+    let mut config = Config {
+        port: 6379u16,
+        replicaof: None,
+        dir: None,
+        dbfilename: None,
+    };
 
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
             "--port" => {
-                port = args[i + 1].parse::<u16>().unwrap();
+                config.port = args[i + 1].parse::<u16>().unwrap();
                 i += 2;
             }
             "--replicaof" => {
-                replicaof = Some(args[i + 1].clone());
+                config.replicaof = Some(args[i + 1].clone());
                 i += 2;
             }
             "--dir" => {
-                dir = Some(args[i + 1].clone());
+                config.dir = Some(args[i + 1].clone());
                 i += 2;
             }
             "--dbfilename" => {
-                dbfilename = Some(args[i + 1].clone());
+                config.dbfilename = Some(args[i + 1].clone());
                 i += 2;
             }
             _ => i += 1,
         }
     }
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port))
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await
         .unwrap();
 
     let db = Arc::new(Mutex::new(HashMap::new()));
     let notify = Arc::new(Notify::new());
-    let role = if replicaof.is_some() {
+    let role = if config.replicaof.is_some() {
         "slave"
     } else {
         "master"
     };
     let replicas: Replicas = Arc::new(TokioMutex::new(Vec::new()));
+    let config = Arc::new(config);
 
-    if let Some(replicaof) = replicaof {
+    if config.replicaof.is_some() {
         let db = Arc::clone(&db);
+        let config = Arc::clone(&config);
 
         tokio::spawn(async move {
-            start_replica_handshake(replicaof, port, db).await;
+            start_replica_handshake(config, db).await;
         });
     }
 
@@ -75,20 +85,10 @@ async fn main() {
                 let db = Arc::clone(&db);
                 let notify = Arc::clone(&notify);
                 let replicas = Arc::clone(&replicas);
-                let dir = dir.clone().unwrap_or_default();
-                let dbfilename = dbfilename.clone().unwrap_or_default();
+                let config = Arc::clone(&config);
 
                 tokio::spawn(async move {
-                    handle_stream(
-                        stream,
-                        db,
-                        notify,
-                        role.to_string(),
-                        replicas,
-                        dir,
-                        dbfilename,
-                    )
-                    .await;
+                    handle_stream(stream, db, notify, role.to_string(), replicas, config).await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),

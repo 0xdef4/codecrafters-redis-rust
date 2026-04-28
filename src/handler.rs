@@ -8,7 +8,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use crate::{Db, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays, encode};
+use crate::{
+    Config, Db, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays, encode,
+};
 
 pub async fn handle_stream(
     stream: TcpStream,
@@ -16,8 +18,7 @@ pub async fn handle_stream(
     notify: Arc<Notify>,
     role: String,
     replicas: Replicas,
-    dir: String,
-    dbfilename: String,
+    config: Arc<Config>,
 ) {
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
@@ -1366,7 +1367,13 @@ pub async fn handle_stream(
                                         .write_all(
                                             encode(RespValue::Array(vec![
                                                 RespValue::BulkString("dir".to_string()),
-                                                RespValue::BulkString(dir.to_string()),
+                                                RespValue::BulkString(
+                                                    config
+                                                        .dir
+                                                        .as_deref()
+                                                        .unwrap_or_default()
+                                                        .to_string(),
+                                                ),
                                             ]))
                                             .as_bytes(),
                                         )
@@ -1377,7 +1384,13 @@ pub async fn handle_stream(
                                         .write_all(
                                             encode(RespValue::Array(vec![
                                                 RespValue::BulkString("dbfilename".to_string()),
-                                                RespValue::BulkString(dbfilename.to_string()),
+                                                RespValue::BulkString(
+                                                    config
+                                                        .dbfilename
+                                                        .as_deref()
+                                                        .unwrap_or_default()
+                                                        .to_string(),
+                                                ),
                                             ]))
                                             .as_bytes(),
                                         )

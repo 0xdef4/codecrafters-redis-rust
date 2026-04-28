@@ -6,12 +6,12 @@ use tokio::sync::Mutex as TokioMutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::{Db, RedisValue, RespValue, ValueType, decode_arrays, encode};
+use crate::{Config, Db, RedisValue, RespValue, ValueType, decode_arrays, encode};
 
 pub type Replicas = Arc<TokioMutex<Vec<(OwnedWriteHalf, OwnedReadHalf)>>>;
 
-pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
-    if let Some((master_ip, master_port)) = replicaof.split_once(' ') {
+pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
+    if let Some((master_ip, master_port)) = config.replicaof.as_ref().unwrap().split_once(' ') {
         let master_addr = format!("{}:{}", master_ip, master_port);
         let mut master_stream = TcpStream::connect(master_addr).await.unwrap();
 
@@ -35,7 +35,7 @@ pub async fn start_replica_handshake(replicaof: String, port: u16, db: Db) {
                 encode(RespValue::Array(vec![
                     RespValue::BulkString("REPLCONF".to_string()),
                     RespValue::BulkString("listening-port".to_string()),
-                    RespValue::BulkString(port.to_string()),
+                    RespValue::BulkString(config.port.to_string()),
                 ]))
                 .as_bytes(),
             )
