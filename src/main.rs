@@ -2,15 +2,20 @@ use tokio::net::TcpListener;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
+use std::fmt::format;
+use std::fs::File;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 mod db;
 mod handler;
+mod rdb;
 mod replication;
 mod resp;
 
 use db::*;
 use handler::*;
+use rdb::*;
 use replication::*;
 use resp::*;
 
@@ -77,6 +82,30 @@ async fn main() {
         tokio::spawn(async move {
             start_replica_handshake(config, db).await;
         });
+    }
+
+    // read RDB file from path
+
+    if config.dir.is_some() && config.dbfilename.is_some() {
+        let dir = config.dir.as_ref().unwrap();
+        let dbfilename = config.dbfilename.as_ref().unwrap();
+
+        // Note: this example does work on Windows
+        let path_string = format!("{}/{}", dir, dbfilename);
+        let path = Path::new(path_string.as_str());
+
+        let f = File::open(path);
+
+        match f {
+            Ok(mut rdb_file) => {
+                // RDB 파일 존재하면 파싱해서 db에 insert
+                let db = Arc::clone(&db);
+                parse_rdb(&mut rdb_file, db);
+            }
+            Err(_) => {
+                // do nothing
+            }
+        }
     }
 
     loop {

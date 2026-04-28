@@ -1399,6 +1399,17 @@ pub async fn handle_stream(
                                 _ => {}
                             }
                         }
+                        [cmd, pattern] if cmd.to_uppercase() == "KEYS" => {
+                            let keys: Vec<RespValue> = {
+                                let db = db.lock().unwrap();
+                                db.keys()
+                                    .map(|k| RespValue::BulkString(k.clone()))
+                                    .collect()
+                            };
+                            let _ = wr
+                                .write_all(encode(RespValue::Array(keys)).as_bytes())
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
