@@ -1,22 +1,15 @@
-use crate::Db;
+use crate::{Db, RedisValue, ValueType};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs::File, io::Read};
 
-// pub fn parse_rdb(rdb_file: &mut File, db: Db) {
-//     // RDB 파싱 핵심 로직 (이번 스테이지 기준):
-
-//     // REDIS0011 헤더 스킵
-//     // FA 메타데이터 섹션 스킵
-//     // FE 데이터베이스 섹션 찾기
-//     // FB 이후 해시테이블 사이즈 읽기
-//     // 이후 00 (string 타입) + key + value 읽기
-//     // FF 나오면 끝
-
-//     let mut buffer = Vec::new();
-//     let _ = rdb_file.read_to_end(&mut buffer);
-
-//     // buffer
-//     // TODO
-// }
+// REDIS0011 헤더 스킵
+// FA 메타데이터 key/value 스킵
+// FE 데이터베이스 인덱스 스킵
+// FB 해시테이블 크기 2개 스킵
+// FC expire(ms) + key + value 저장
+// FD expire(seconds) + key + value 저장
+// 00 key + value 저장
+// FF 끝
 
 pub fn parse_rdb(rdb_file: &mut File, db: Db) {
     let mut buffer = Vec::new();
@@ -62,11 +55,11 @@ pub fn parse_rdb(rdb_file: &mut File, db: Db) {
                 let (value, next) = read_string(&buffer, i);
                 i = next;
 
-                let expires_at = std::time::Instant::now()
-                    + std::time::Duration::from_millis(
+                let expires_at = Instant::now()
+                    + Duration::from_millis(
                         expire_ms.saturating_sub(
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
+                            SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
                                 .unwrap()
                                 .as_millis() as u64,
                         ),
@@ -75,7 +68,7 @@ pub fn parse_rdb(rdb_file: &mut File, db: Db) {
                 let mut db = db.lock().unwrap();
                 db.insert(
                     key,
-                    crate::RedisValue::new(crate::ValueType::String(value), Some(expires_at)),
+                    RedisValue::new(ValueType::String(value), Some(expires_at)),
                 );
             }
             0xFD => {
@@ -91,11 +84,11 @@ pub fn parse_rdb(rdb_file: &mut File, db: Db) {
                 let (value, next) = read_string(&buffer, i);
                 i = next;
 
-                let expires_at = std::time::Instant::now()
-                    + std::time::Duration::from_secs(
+                let expires_at = Instant::now()
+                    + Duration::from_secs(
                         (expire_secs as u64).saturating_sub(
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
+                            SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
                                 .unwrap()
                                 .as_secs(),
                         ),
@@ -104,7 +97,7 @@ pub fn parse_rdb(rdb_file: &mut File, db: Db) {
                 let mut db = db.lock().unwrap();
                 db.insert(
                     key,
-                    crate::RedisValue::new(crate::ValueType::String(value), Some(expires_at)),
+                    RedisValue::new(ValueType::String(value), Some(expires_at)),
                 );
             }
             0xFF => {
@@ -119,10 +112,7 @@ pub fn parse_rdb(rdb_file: &mut File, db: Db) {
                 i = next;
 
                 let mut db = db.lock().unwrap();
-                db.insert(
-                    key,
-                    crate::RedisValue::new(crate::ValueType::String(value), None),
-                );
+                db.insert(key, RedisValue::new(ValueType::String(value), None));
             }
             _ => {
                 i += 1;

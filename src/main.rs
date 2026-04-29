@@ -2,7 +2,6 @@ use tokio::net::TcpListener;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
-use std::fmt::format;
 use std::fs::File;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
