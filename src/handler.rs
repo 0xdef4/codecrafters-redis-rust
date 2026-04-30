@@ -1,15 +1,15 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, mpsc};
 use tokio::time::timeout;
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use anyhow::Result;
-
 use crate::{
-    Config, Db, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays, encode,
+    Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays,
+    encode,
 };
 
 pub async fn handle_stream(
@@ -19,9 +19,11 @@ pub async fn handle_stream(
     role: String,
     replicas: Replicas,
     config: Arc<Config>,
+    pubsub: Pubsub,
 ) {
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
+    let mut subscribed_channels: HashSet<String> = HashSet::new();
 
     let mut master_repl_offset: usize = 0;
 
@@ -1151,6 +1153,30 @@ pub async fn handle_stream(
                             let _ = wr
                                 .write_all(encode(RespValue::Array(keys)).as_bytes())
                                 .await;
+                        }
+                        [cmd, channelname] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
+                            let (tx, mut _rx) = mpsc::channel::<usize>(0);
+                            {
+                                let mut pubsub = pubsub.lock().unwrap();
+
+                                pubsub.entry(channelname.to_string()).or_default().push(tx);
+                            };
+
+                            subscribed_channels.insert(channelname.to_string());
+                            let subscribed_channels_count = subscribed_channels.len();
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::Array(vec![
+                                        RespValue::BulkString("subscribe".to_string()),
+                                        RespValue::BulkString(channelname.to_string()),
+                                        RespValue::Integers(subscribed_channels_count as i64),
+                                    ]))
+                                    .as_bytes(),
+                                )
+                                .await;
+
+                            // rx.recv().await;
                         }
                         _ => unreachable!(),
                     }

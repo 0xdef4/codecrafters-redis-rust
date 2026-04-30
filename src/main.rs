@@ -1,4 +1,5 @@
 use tokio::net::TcpListener;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
@@ -25,6 +26,8 @@ pub struct Config {
     pub dir: Option<String>,
     pub dbfilename: Option<String>,
 }
+
+pub type Pubsub = Arc<Mutex<HashMap<String, Vec<Sender<usize>>>>>;
 
 #[tokio::main]
 async fn main() {
@@ -73,6 +76,7 @@ async fn main() {
     };
     let replicas: Replicas = Arc::new(TokioMutex::new(Vec::new()));
     let config = Arc::new(config);
+    let pubsub = Arc::new(Mutex::new(HashMap::new()));
 
     if config.replicaof.is_some() {
         let db = Arc::clone(&db);
@@ -111,9 +115,19 @@ async fn main() {
                 let notify = Arc::clone(&notify);
                 let replicas = Arc::clone(&replicas);
                 let config = Arc::clone(&config);
+                let pubsub = Arc::clone(&pubsub);
 
                 tokio::spawn(async move {
-                    handle_stream(stream, db, notify, role.to_string(), replicas, config).await;
+                    handle_stream(
+                        stream,
+                        db,
+                        notify,
+                        role.to_string(),
+                        replicas,
+                        config,
+                        pubsub,
+                    )
+                    .await;
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),
