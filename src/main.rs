@@ -83,13 +83,10 @@ async fn main() {
         });
     }
 
-    // read RDB file from path
-
     if config.dir.is_some() && config.dbfilename.is_some() {
         let dir = config.dir.as_ref().unwrap();
         let dbfilename = config.dbfilename.as_ref().unwrap();
 
-        // Note: this example does work on Windows
         let path_string = format!("{}/{}", dir, dbfilename);
         let path = Path::new(path_string.as_str());
 
