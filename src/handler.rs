@@ -1155,7 +1155,7 @@ pub async fn handle_stream(
                                 .await;
                         }
                         [cmd, channelname] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
-                            let (tx, mut _rx) = mpsc::channel::<usize>(0);
+                            let (tx, mut _rx) = mpsc::channel::<usize>(100);
                             {
                                 let mut pubsub = pubsub.lock().unwrap();
 
