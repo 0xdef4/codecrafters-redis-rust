@@ -1177,6 +1177,92 @@ pub async fn handle_stream(
                                 .await;
 
                             // rx.recv().await;
+
+                            // enter subscribe mode
+                            loop {
+                                match rd.read(&mut buf).await {
+                                    Ok(0) => break,
+                                    Ok(n) => {
+                                        let received = String::from_utf8_lossy(&buf[..n]);
+                                        let commands = decode_arrays(&received);
+
+                                        for resp_array in commands {
+                                            match resp_array.as_slice() {
+                                                [cmd, channelname]
+                                                    if cmd.to_uppercase()
+                                                        == "SUBSCRIBE".to_string() =>
+                                                {
+                                                    let (tx, mut _rx) = mpsc::channel::<usize>(100);
+                                                    {
+                                                        let mut pubsub = pubsub.lock().unwrap();
+
+                                                        pubsub
+                                                            .entry(channelname.to_string())
+                                                            .or_default()
+                                                            .push(tx);
+                                                    };
+
+                                                    subscribed_channels
+                                                        .insert(channelname.to_string());
+                                                    let subscribed_channels_count =
+                                                        subscribed_channels.len();
+
+                                                    let _ = wr
+                                                        .write_all(
+                                                            encode(RespValue::Array(vec![
+                                                                RespValue::BulkString(
+                                                                    "subscribe".to_string(),
+                                                                ),
+                                                                RespValue::BulkString(
+                                                                    channelname.to_string(),
+                                                                ),
+                                                                RespValue::Integers(
+                                                                    subscribed_channels_count
+                                                                        as i64,
+                                                                ),
+                                                            ]))
+                                                            .as_bytes(),
+                                                        )
+                                                        .await;
+                                                }
+                                                [cmd]
+                                                    if cmd.to_uppercase()
+                                                        == "UNSUBSCRIBE".to_string() => {}
+                                                [cmd]
+                                                    if cmd.to_uppercase()
+                                                        == "PSUBSCRIBE".to_string() => {}
+                                                [cmd]
+                                                    if cmd.to_uppercase()
+                                                        == "PUNSUBSCRIBE".to_string() => {}
+                                                [cmd]
+                                                    if cmd.to_uppercase() == "PING".to_string() => {
+                                                }
+                                                [cmd]
+                                                    if cmd.to_uppercase() == "QUIT".to_string() => {
+                                                }
+                                                _ => {
+                                                    if let [cmd, _rest @ ..] = resp_array.as_slice()
+                                                    {
+                                                        let error_message = format!(
+                                                            "ERR Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context",
+                                                            cmd
+                                                        );
+                                                        let _ = wr
+                                                            .write_all(
+                                                                encode(RespValue::SimpleError(
+                                                                    error_message,
+                                                                ))
+                                                                .as_bytes(),
+                                                            )
+                                                            .await;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(_) => break,
+                                }
+                            }
                         }
                         _ => unreachable!(),
                     }
