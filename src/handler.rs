@@ -1154,22 +1154,22 @@ pub async fn handle_stream(
                                 .write_all(encode(RespValue::Array(keys)).as_bytes())
                                 .await;
                         }
-                        [cmd, channelname] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
+                        [cmd, channel_name] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
                             let (tx, mut _rx) = mpsc::channel::<usize>(100);
                             {
                                 let mut pubsub = pubsub.lock().unwrap();
 
-                                pubsub.entry(channelname.to_string()).or_default().push(tx);
+                                pubsub.entry(channel_name.to_string()).or_default().push(tx);
                             };
 
-                            subscribed_channels.insert(channelname.to_string());
+                            subscribed_channels.insert(channel_name.to_string());
                             let subscribed_channels_count = subscribed_channels.len();
 
                             let _ = wr
                                 .write_all(
                                     encode(RespValue::Array(vec![
                                         RespValue::BulkString("subscribe".to_string()),
-                                        RespValue::BulkString(channelname.to_string()),
+                                        RespValue::BulkString(channel_name.to_string()),
                                         RespValue::Integers(subscribed_channels_count as i64),
                                     ]))
                                     .as_bytes(),
@@ -1188,7 +1188,7 @@ pub async fn handle_stream(
 
                                         for resp_array in commands {
                                             match resp_array.as_slice() {
-                                                [cmd, channelname]
+                                                [cmd, channel_name]
                                                     if cmd.to_uppercase()
                                                         == "SUBSCRIBE".to_string() =>
                                                 {
@@ -1197,13 +1197,13 @@ pub async fn handle_stream(
                                                         let mut pubsub = pubsub.lock().unwrap();
 
                                                         pubsub
-                                                            .entry(channelname.to_string())
+                                                            .entry(channel_name.to_string())
                                                             .or_default()
                                                             .push(tx);
                                                     };
 
                                                     subscribed_channels
-                                                        .insert(channelname.to_string());
+                                                        .insert(channel_name.to_string());
                                                     let subscribed_channels_count =
                                                         subscribed_channels.len();
 
@@ -1214,7 +1214,7 @@ pub async fn handle_stream(
                                                                     "subscribe".to_string(),
                                                                 ),
                                                                 RespValue::BulkString(
-                                                                    channelname.to_string(),
+                                                                    channel_name.to_string(),
                                                                 ),
                                                                 RespValue::Integers(
                                                                     subscribed_channels_count
@@ -1277,6 +1277,33 @@ pub async fn handle_stream(
                                     Err(_) => break,
                                 }
                             }
+                        }
+                        [cmd, channel_name, message_contents]
+                            if cmd.to_uppercase() == "PUBLISH".to_string() =>
+                        {
+                            let num_clients_subscribed = {
+                                let mut pubsub = pubsub.lock().unwrap();
+
+                                // search for channelname in pubsub
+                                if let Some(tx_list) = pubsub.get(channel_name) {
+                                    // for tx in tx_list.iter() {
+                                    //     // and send message to every tx
+                                    //     tx.send(message_contents).await;
+                                    // }
+
+                                    tx_list.len()
+                                } else {
+                                    0
+                                }
+                            };
+
+                            // respond : number of clients that are subscribed to the channel.
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::Integers(num_clients_subscribed as i64))
+                                        .as_bytes(),
+                                )
+                                .await;
                         }
                         _ => unreachable!(),
                     }
