@@ -1235,7 +1235,21 @@ pub async fn handle_stream(
                                                     if cmd.to_uppercase()
                                                         == "PUNSUBSCRIBE".to_string() => {}
                                                 [cmd]
-                                                    if cmd.to_uppercase() == "PING".to_string() => {
+                                                    if cmd.to_uppercase() == "PING".to_string() =>
+                                                {
+                                                    let _ = wr
+                                                        .write_all(
+                                                            encode(RespValue::Array(vec![
+                                                                RespValue::BulkString(
+                                                                    "pong".to_string(),
+                                                                ),
+                                                                RespValue::BulkString(
+                                                                    "".to_string(),
+                                                                ),
+                                                            ]))
+                                                            .as_bytes(),
+                                                        )
+                                                        .await;
                                                 }
                                                 [cmd]
                                                     if cmd.to_uppercase() == "QUIT".to_string() => {
