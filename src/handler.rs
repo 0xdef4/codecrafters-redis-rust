@@ -1155,11 +1155,13 @@ pub async fn handle_stream(
                                 .await;
                         }
                         [cmd, channel_name] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
-                            let (tx, mut _rx) = mpsc::channel::<usize>(100);
+                            let (tx, mut rx) = mpsc::channel::<(String, String)>(100);
                             {
                                 let mut pubsub = pubsub.lock().unwrap();
-
-                                pubsub.entry(channel_name.to_string()).or_default().push(tx);
+                                pubsub
+                                    .entry(channel_name.to_string())
+                                    .or_default()
+                                    .push(tx.clone());
                             };
 
                             subscribed_channels.insert(channel_name.to_string());
@@ -1176,132 +1178,129 @@ pub async fn handle_stream(
                                 )
                                 .await;
 
-                            // rx.recv().await;
-
-                            // enter subscribe mode
                             loop {
-                                match rd.read(&mut buf).await {
-                                    Ok(0) => break,
-                                    Ok(n) => {
-                                        let received = String::from_utf8_lossy(&buf[..n]);
-                                        let commands = decode_arrays(&received);
+                                tokio::select! {
+                                    Ok(n) = rd.read(&mut buf) => {
+                                           let received = String::from_utf8_lossy(&buf[..n]);
+                                           let commands = decode_arrays(&received);
 
-                                        for resp_array in commands {
-                                            match resp_array.as_slice() {
-                                                [cmd, channel_name]
-                                                    if cmd.to_uppercase()
-                                                        == "SUBSCRIBE".to_string() =>
-                                                {
-                                                    let (tx, mut _rx) = mpsc::channel::<usize>(100);
-                                                    {
-                                                        let mut pubsub = pubsub.lock().unwrap();
+                                           for resp_array in commands {
+                                               match resp_array.as_slice() {
+                                                   [cmd, channel_name]
+                                                       if cmd.to_uppercase()
+                                                           == "SUBSCRIBE".to_string() =>
+                                                   {
+                                                       {
+                                                           let mut pubsub = pubsub.lock().unwrap();
+                                                           pubsub
+                                                               .entry(channel_name.to_string())
+                                                               .or_default()
+                                                               .push(tx.clone());
+                                                       };
 
-                                                        pubsub
-                                                            .entry(channel_name.to_string())
-                                                            .or_default()
-                                                            .push(tx);
-                                                    };
+                                                       subscribed_channels
+                                                           .insert(channel_name.to_string());
+                                                       let subscribed_channels_count =
+                                                           subscribed_channels.len();
 
-                                                    subscribed_channels
-                                                        .insert(channel_name.to_string());
-                                                    let subscribed_channels_count =
-                                                        subscribed_channels.len();
-
-                                                    let _ = wr
-                                                        .write_all(
-                                                            encode(RespValue::Array(vec![
-                                                                RespValue::BulkString(
-                                                                    "subscribe".to_string(),
-                                                                ),
-                                                                RespValue::BulkString(
-                                                                    channel_name.to_string(),
-                                                                ),
-                                                                RespValue::Integers(
-                                                                    subscribed_channels_count
-                                                                        as i64,
-                                                                ),
-                                                            ]))
-                                                            .as_bytes(),
-                                                        )
-                                                        .await;
-                                                }
-                                                [cmd]
-                                                    if cmd.to_uppercase()
-                                                        == "UNSUBSCRIBE".to_string() => {}
-                                                [cmd]
-                                                    if cmd.to_uppercase()
-                                                        == "PSUBSCRIBE".to_string() => {}
-                                                [cmd]
-                                                    if cmd.to_uppercase()
-                                                        == "PUNSUBSCRIBE".to_string() => {}
-                                                [cmd]
-                                                    if cmd.to_uppercase() == "PING".to_string() =>
-                                                {
-                                                    let _ = wr
-                                                        .write_all(
-                                                            encode(RespValue::Array(vec![
-                                                                RespValue::BulkString(
-                                                                    "pong".to_string(),
-                                                                ),
-                                                                RespValue::BulkString(
-                                                                    "".to_string(),
-                                                                ),
-                                                            ]))
-                                                            .as_bytes(),
-                                                        )
-                                                        .await;
-                                                }
-                                                [cmd]
-                                                    if cmd.to_uppercase() == "QUIT".to_string() => {
-                                                }
-                                                _ => {
-                                                    if let [cmd, _rest @ ..] = resp_array.as_slice()
-                                                    {
-                                                        let error_message = format!(
-                                                            "ERR Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context",
-                                                            cmd
-                                                        );
-                                                        let _ = wr
-                                                            .write_all(
-                                                                encode(RespValue::SimpleError(
-                                                                    error_message,
-                                                                ))
-                                                                .as_bytes(),
-                                                            )
-                                                            .await;
-                                                    }
-                                                }
-                                            }
+                                                       let _ = wr
+                                                           .write_all(
+                                                               encode(RespValue::Array(vec![
+                                                                   RespValue::BulkString(
+                                                                       "subscribe".to_string(),
+                                                                   ),
+                                                                   RespValue::BulkString(
+                                                                       channel_name.to_string(),
+                                                                   ),
+                                                                   RespValue::Integers(
+                                                                       subscribed_channels_count
+                                                                           as i64,
+                                                                   ),
+                                                               ]))
+                                                               .as_bytes(),
+                                                           )
+                                                           .await;
+                                                   }
+                                                   [cmd]
+                                                       if cmd.to_uppercase()
+                                                           == "UNSUBSCRIBE".to_string() => {}
+                                                   [cmd]
+                                                       if cmd.to_uppercase()
+                                                           == "PSUBSCRIBE".to_string() => {}
+                                                   [cmd]
+                                                       if cmd.to_uppercase()
+                                                           == "PUNSUBSCRIBE".to_string() => {}
+                                                   [cmd]
+                                                       if cmd.to_uppercase() == "PING".to_string() =>
+                                                   {
+                                                       let _ = wr
+                                                           .write_all(
+                                                               encode(RespValue::Array(vec![
+                                                                   RespValue::BulkString(
+                                                                       "pong".to_string(),
+                                                                   ),
+                                                                   RespValue::BulkString(
+                                                                       "".to_string(),
+                                                                   ),
+                                                               ]))
+                                                               .as_bytes(),
+                                                           )
+                                                           .await;
+                                                   }
+                                                   [cmd]
+                                                       if cmd.to_uppercase() == "QUIT".to_string() => {
+                                                   }
+                                                   _ => {
+                                                       if let [cmd, _rest @ ..] = resp_array.as_slice()
+                                                       {
+                                                           let error_message = format!(
+                                                               "ERR Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context",
+                                                               cmd
+                                                           );
+                                                           let _ = wr
+                                                               .write_all(
+                                                                   encode(RespValue::SimpleError(
+                                                                       error_message,
+                                                                   ))
+                                                                   .as_bytes(),
+                                                               )
+                                                               .await;
+                                                       }
+                                                   }
+                                               }
+                                           }
                                         }
+                                    Some((channel_name, msg)) = rx.recv() => {
+                                        let _ = wr.write_all(encode(
+                                            RespValue::Array(
+                                                vec![
+                                                    RespValue::BulkString("message".to_string()),
+                                                    RespValue::BulkString(channel_name.to_string()),
+                                                    RespValue::BulkString(msg.to_string()),
+                                                ]
+                                            )
+                                        ).as_bytes()).await;
                                     }
-                                    Err(_) => break,
                                 }
                             }
                         }
                         [cmd, channel_name, message_contents]
                             if cmd.to_uppercase() == "PUBLISH".to_string() =>
                         {
-                            let num_clients_subscribed = {
-                                let mut pubsub = pubsub.lock().unwrap();
-
-                                // search for channelname in pubsub
-                                if let Some(tx_list) = pubsub.get(channel_name) {
-                                    // for tx in tx_list.iter() {
-                                    //     // and send message to every tx
-                                    //     tx.send(message_contents).await;
-                                    // }
-
-                                    tx_list.len()
-                                } else {
-                                    0
-                                }
+                            let tx_list = {
+                                let pubsub = pubsub.lock().unwrap();
+                                pubsub.get(channel_name).cloned().unwrap_or_default()
                             };
 
-                            // respond : number of clients that are subscribed to the channel.
+                            for tx in tx_list.iter() {
+                                let _ = tx
+                                    .send((channel_name.to_string(), message_contents.to_string()))
+                                    .await;
+                            }
+
                             let _ = wr
                                 .write_all(
-                                    encode(RespValue::Integers(num_clients_subscribed as i64))
-                                        .as_bytes(),
+                                    encode(RespValue::Integers(tx_list.len() as i64)).as_bytes(),
                                 )
                                 .await;
                         }
