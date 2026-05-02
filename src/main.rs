@@ -9,12 +9,14 @@ use std::sync::{Arc, Mutex};
 
 mod db;
 mod handler;
+mod pubsub;
 mod rdb;
 mod replication;
 mod resp;
 
 use db::*;
 use handler::*;
+use pubsub::*;
 use rdb::*;
 use replication::*;
 use resp::*;
