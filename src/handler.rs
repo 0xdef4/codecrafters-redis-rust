@@ -1225,7 +1225,7 @@ pub async fn handle_stream(
                                                            )
                                                            .await;
                                                    }
-                                                   [cmd]
+                                                   [cmd, channel_name]
                                                        if cmd.to_uppercase()
                                                            == "UNSUBSCRIBE".to_string() => {
                                                         {
