@@ -4,6 +4,7 @@ use tokio::sync::{Notify, mpsc};
 use tokio::time::timeout;
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -11,6 +12,8 @@ use crate::{
     Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays,
     encode,
 };
+
+static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub async fn handle_stream(
     stream: TcpStream,
@@ -21,6 +24,7 @@ pub async fn handle_stream(
     config: Arc<Config>,
     pubsub: Pubsub,
 ) {
+    let client_id = CLIENT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
     let mut subscribed_channels: HashSet<String> = HashSet::new();
@@ -1161,7 +1165,7 @@ pub async fn handle_stream(
                                 pubsub
                                     .entry(channel_name.to_string())
                                     .or_default()
-                                    .push(tx.clone());
+                                    .push((client_id, tx.clone()));
                             };
 
                             subscribed_channels.insert(channel_name.to_string());
@@ -1195,7 +1199,7 @@ pub async fn handle_stream(
                                                            pubsub
                                                                .entry(channel_name.to_string())
                                                                .or_default()
-                                                               .push(tx.clone());
+                                                               .push((client_id, tx.clone()));
                                                        };
 
                                                        subscribed_channels
@@ -1223,7 +1227,35 @@ pub async fn handle_stream(
                                                    }
                                                    [cmd]
                                                        if cmd.to_uppercase()
-                                                           == "UNSUBSCRIBE".to_string() => {}
+                                                           == "UNSUBSCRIBE".to_string() => {
+                                                        {
+                                                           let mut pubsub = pubsub.lock().unwrap();
+                                                           if let Some(list) = pubsub.get_mut(channel_name) {
+                                                             list.retain(|(id, _)| *id != client_id);
+                                                           }
+                                                        }
+
+                                                        subscribed_channels.remove(channel_name);
+                                                        let subscribed_channels_count = subscribed_channels.len();
+
+                                                       let _ = wr
+                                                           .write_all(
+                                                               encode(RespValue::Array(vec![
+                                                                   RespValue::BulkString(
+                                                                       "unsubscribe".to_string(),
+                                                                   ),
+                                                                   RespValue::BulkString(
+                                                                       channel_name.to_string(),
+                                                                   ),
+                                                                   RespValue::Integers(
+                                                                       subscribed_channels_count
+                                                                           as i64,
+                                                                   ),
+                                                               ]))
+                                                               .as_bytes(),
+                                                           )
+                                                           .await;
+                                                    }
                                                    [cmd]
                                                        if cmd.to_uppercase()
                                                            == "PSUBSCRIBE".to_string() => {}
@@ -1294,6 +1326,7 @@ pub async fn handle_stream(
 
                             for tx in tx_list.iter() {
                                 let _ = tx
+                                    .1
                                     .send((channel_name.to_string(), message_contents.to_string()))
                                     .await;
                             }

@@ -27,7 +27,7 @@ pub struct Config {
     pub dbfilename: Option<String>,
 }
 
-pub type Pubsub = Arc<Mutex<HashMap<String, Vec<Sender<(String, String)>>>>>;
+pub type Pubsub = Arc<Mutex<HashMap<String, Vec<(u64, Sender<(String, String)>)>>>>;
 
 #[tokio::main]
 async fn main() {
