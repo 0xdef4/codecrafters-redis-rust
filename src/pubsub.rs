@@ -10,13 +10,11 @@ pub async fn handle_subscribe_loop(
     mut wr: OwnedWriteHalf,
     mut rd: BufReader<OwnedReadHalf>,
     pubsub: Pubsub,
-    // channel_name: &str,
     client_id: u64,
     tx: mpsc::Sender<(String, String)>,
     mut rx: mpsc::Receiver<(String, String)>,
     mut subscribed_channels: HashSet<String>,
 ) {
-    // 기존 tokio::select! 루프 그대로
     let mut buf = [0u8; 512];
 
     loop {
