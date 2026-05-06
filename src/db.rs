@@ -1,10 +1,75 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::resp::RespValue;
 
 pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
+
+#[allow(unused)]
+pub enum ValueType {
+    String(String),
+    List(Vec<String>),
+    Stream(Vec<StreamEntry>),
+    Set(),
+    Zset(Zset),
+    Hash(),
+    Vectorset(),
+}
+
+pub struct RedisValue {
+    pub value: ValueType,
+    pub expires_at: Option<Instant>,
+}
+
+impl RedisValue {
+    pub fn new(value: ValueType, expires_at: Option<Instant>) -> Self {
+        Self { value, expires_at }
+    }
+}
+
+pub struct Zset {
+    sorted: BTreeMap<(u64, String), f64>,
+    scores: HashMap<String, f64>,
+}
+
+impl Zset {
+    pub fn new() -> Self {
+        Self {
+            sorted: BTreeMap::new(),
+            scores: HashMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, score: f64, member: String) -> usize {
+        // check if already exists
+        if let Some(old_score) = self.scores.get(&member.clone()) {
+            // if exist, remove it from Btreemap
+            self.sorted
+                .remove(&(score_bits(*old_score), member.clone()));
+        }
+
+        let is_new = !self.scores.contains_key(&member.clone());
+
+        // add it to Btreemap
+        self.scores.insert(member.clone(), score);
+        // add it to Hashmap
+        self.sorted
+            .insert((score_bits(score), member.clone()), score);
+
+        // return usize
+        if is_new { 1 } else { 0 }
+    }
+}
+
+fn score_bits(score: f64) -> u64 {
+    let bits = score.to_bits();
+    if bits >> 63 == 0 {
+        bits | (1 << 63)
+    } else {
+        !bits
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct StreamEntry {
@@ -36,27 +101,5 @@ impl StreamEntry {
         output.push(RespValue::Array(fields_vec));
 
         RespValue::Array(output)
-    }
-}
-
-#[allow(unused)]
-pub enum ValueType {
-    String(String),
-    List(Vec<String>),
-    Stream(Vec<StreamEntry>),
-    Set(),
-    Zset(),
-    Hash(),
-    Vectorset(),
-}
-
-pub struct RedisValue {
-    pub value: ValueType,
-    pub expires_at: Option<Instant>,
-}
-
-impl RedisValue {
-    pub fn new(value: ValueType, expires_at: Option<Instant>) -> Self {
-        Self { value, expires_at }
     }
 }

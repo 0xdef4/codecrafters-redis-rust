@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::db::Zset;
 use crate::{
     Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays,
     encode, handle_subscribe_loop,
@@ -384,7 +385,7 @@ pub async fn handle_stream(
                                         ValueType::String(_) => "string".to_string(),
                                         ValueType::List(_) => "list".to_string(),
                                         ValueType::Set() => "set".to_string(),
-                                        ValueType::Zset() => "zset".to_string(),
+                                        ValueType::Zset(_) => "zset".to_string(),
                                         ValueType::Hash() => "hash".to_string(),
                                         ValueType::Stream(_) => "stream".to_string(),
                                         ValueType::Vectorset() => "vectorset".to_string(),
@@ -1214,6 +1215,38 @@ pub async fn handle_stream(
                                     encode(RespValue::Integers(tx_list.len() as i64)).as_bytes(),
                                 )
                                 .await;
+                        }
+                        [cmd, key, score, member] => {
+                            if cmd.to_uppercase() == "ZADD".to_string() {
+                                let num_new_members_added = {
+                                    let mut db = db.lock().unwrap();
+                                    if let Some(redis_value) = db.get_mut(key) {
+                                        if let ValueType::Zset(sorted_set) = &mut redis_value.value
+                                        {
+                                            sorted_set
+                                                .add(score.parse().unwrap(), member.to_string())
+                                        } else {
+                                            unimplemented!()
+                                        }
+                                    } else {
+                                        let mut zset = Zset::new();
+                                        zset.add(score.parse().unwrap(), member.to_string());
+
+                                        let redis_value =
+                                            RedisValue::new(ValueType::Zset(zset), None);
+
+                                        db.insert(key.to_string(), redis_value);
+                                        1
+                                    }
+                                };
+
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::Integers(num_new_members_added as i64))
+                                            .as_bytes(),
+                                    )
+                                    .await;
+                            }
                         }
                         _ => unreachable!(),
                     }
