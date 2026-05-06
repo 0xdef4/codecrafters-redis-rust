@@ -42,22 +42,17 @@ impl Zset {
     }
 
     pub fn add(&mut self, score: f64, member: String) -> usize {
-        // check if already exists
         if let Some(old_score) = self.scores.get(&member.clone()) {
-            // if exist, remove it from Btreemap
             self.sorted
                 .remove(&(score_bits(*old_score), member.clone()));
         }
 
         let is_new = !self.scores.contains_key(&member.clone());
 
-        // add it to Btreemap
         self.scores.insert(member.clone(), score);
-        // add it to Hashmap
         self.sorted
             .insert((score_bits(score), member.clone()), score);
 
-        // return usize
         if is_new { 1 } else { 0 }
     }
 }

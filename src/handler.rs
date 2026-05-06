@@ -1220,6 +1220,7 @@ pub async fn handle_stream(
                             if cmd.to_uppercase() == "ZADD".to_string() {
                                 let num_new_members_added = {
                                     let mut db = db.lock().unwrap();
+
                                     if let Some(redis_value) = db.get_mut(key) {
                                         if let ValueType::Zset(sorted_set) = &mut redis_value.value
                                         {
