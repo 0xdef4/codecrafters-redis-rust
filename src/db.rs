@@ -56,19 +56,13 @@ impl Zset {
         if is_new { 1 } else { 0 }
     }
 
-    pub fn query_rank(&self, member: String) -> isize {
-        if let Some(score) = self.scores.get(&member) {
-            match self
-                .sorted
-                .keys()
-                .position(|x| x == &(score_bits(*score), member.clone()))
-            {
-                Some(rank) => rank as isize,
-                None => -1,
-            }
-        } else {
-            -1
-        }
+    pub fn query_index(&self, member: String) -> isize {
+        self.sorted
+            .keys()
+            .enumerate()
+            .find(|(_, (_, m))| m == &member)
+            .map(|(index, _)| index as isize)
+            .unwrap_or(-1)
     }
 
     pub fn query_range(&self, start_index: i64, stop_index: i64) -> Vec<String> {

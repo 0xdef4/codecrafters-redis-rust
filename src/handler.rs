@@ -1251,7 +1251,7 @@ pub async fn handle_stream(
                                 let db = db.lock().unwrap();
                                 if let Some(redis_value) = db.get(zset_key) {
                                     if let ValueType::Zset(sorted_set) = &redis_value.value {
-                                        sorted_set.query_rank(member.to_string())
+                                        sorted_set.query_index(member.to_string())
                                     } else {
                                         -1
                                     }
