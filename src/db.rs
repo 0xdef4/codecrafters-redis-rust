@@ -71,23 +71,29 @@ impl Zset {
         }
     }
 
-    // test non negative inputs
-    pub fn query_range(&self, start_index: u64, stop_index: u64) -> Vec<String> {
-        let len = self.sorted.len();
+    pub fn query_range(&self, start_index: i64, stop_index: i64) -> Vec<String> {
+        let len = self.sorted.len() as i64;
 
-        if start_index > stop_index {
-            return vec![];
-        }
+        let start = if start_index < 0 {
+            (len + start_index).max(0)
+        } else {
+            start_index
+        };
+        let stop = if stop_index < 0 {
+            (len + stop_index).max(0)
+        } else {
+            stop_index.min(len - 1)
+        };
 
-        if start_index >= len as u64 {
+        if start > stop {
             return vec![];
         }
 
         self.sorted
             .iter()
-            .skip(start_index as usize)
-            .take((stop_index - start_index + 1) as usize)
-            .map(|((_, member), &_score)| member.clone())
+            .skip(start as usize)
+            .take((stop - start + 1) as usize)
+            .map(|((_, member), _)| member.clone())
             .collect()
     }
 }
