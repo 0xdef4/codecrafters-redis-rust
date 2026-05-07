@@ -42,12 +42,12 @@ impl Zset {
     }
 
     pub fn add(&mut self, score: f64, member: String) -> usize {
-        if let Some(old_score) = self.scores.get(&member.clone()) {
+        if let Some(old_score) = self.scores.get(&member) {
             self.sorted
                 .remove(&(score_bits(*old_score), member.clone()));
         }
 
-        let is_new = !self.scores.contains_key(&member.clone());
+        let is_new = !self.scores.contains_key(&member);
 
         self.scores.insert(member.clone(), score);
         self.sorted
@@ -69,6 +69,25 @@ impl Zset {
         } else {
             -1
         }
+    }
+
+    pub fn query_range(&self, start_index: u64, stop_index: u64) -> Vec<String> {
+        let len = self.sorted.len();
+
+        if start_index > stop_index {
+            return vec![];
+        }
+
+        if start_index >= len as u64 {
+            return vec![];
+        }
+
+        self.sorted
+            .iter()
+            .skip(start_index as usize)
+            .take((stop_index - start_index + 1) as usize)
+            .map(|((_, member), &_score)| member.clone())
+            .collect()
     }
 }
 
