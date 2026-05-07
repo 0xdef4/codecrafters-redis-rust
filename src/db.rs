@@ -55,6 +55,21 @@ impl Zset {
 
         if is_new { 1 } else { 0 }
     }
+
+    pub fn query_rank(&self, member: String) -> isize {
+        if let Some(score) = self.scores.get(&member) {
+            match self
+                .sorted
+                .keys()
+                .position(|x| x == &(score_bits(*score), member.clone()))
+            {
+                Some(rank) => rank as isize,
+                None => -1,
+            }
+        } else {
+            -1
+        }
+    }
 }
 
 fn score_bits(score: f64) -> u64 {
