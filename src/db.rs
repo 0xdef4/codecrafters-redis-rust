@@ -71,6 +71,7 @@ impl Zset {
         }
     }
 
+    // test non negative inputs
     pub fn query_range(&self, start_index: u64, stop_index: u64) -> Vec<String> {
         let len = self.sorted.len();
 
