@@ -56,6 +56,17 @@ impl Zset {
         if is_new { 1 } else { 0 }
     }
 
+    pub fn remove(&mut self, member: String) -> usize {
+        if let Some(old_score) = self.scores.get(&member) {
+            self.sorted
+                .remove(&(score_bits(*old_score), member.clone()));
+            self.scores.remove(&member);
+            1
+        } else {
+            0
+        }
+    }
+
     pub fn query_length(&self) -> usize {
         self.sorted.len()
     }

@@ -1366,6 +1366,28 @@ pub async fn handle_stream(
                                 }
                             }
                         }
+                        [cmd, zset_key, member] if cmd.to_uppercase() == "ZREM".to_string() => {
+                            let num_members_removed = {
+                                let mut db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get_mut(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &mut redis_value.value {
+                                        sorted_set.remove(member.to_string())
+                                    } else {
+                                        0
+                                    }
+                                } else {
+                                    0
+                                }
+                            };
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::Integers(num_members_removed as i64))
+                                        .as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
