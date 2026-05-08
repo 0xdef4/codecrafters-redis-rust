@@ -60,6 +60,10 @@ impl Zset {
         self.sorted.len()
     }
 
+    pub fn query_score(&self, member: String) -> f64 {
+        *self.scores.get(&member).unwrap()
+    }
+
     pub fn query_index(&self, member: String) -> isize {
         self.sorted
             .keys()

@@ -1320,6 +1320,33 @@ pub async fn handle_stream(
                                 )
                                 .await;
                         }
+                        [cmd, zset_key, member] if cmd.to_uppercase() == "ZSCORE".to_string() => {
+                            let score: Option<f64> = {
+                                let db = db.lock().unwrap();
+                                if let Some(redis_value) = db.get(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                        Some(sorted_set.query_score(member.to_string()))
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            if score.is_none() {
+                                let _ = wr
+                                    .write_all(encode(RespValue::BulkStringNull).as_bytes())
+                                    .await;
+                            } else {
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::BulkString(score.unwrap().to_string()))
+                                            .as_bytes(),
+                                    )
+                                    .await;
+                            }
+                        }
                         _ => unreachable!(),
                     }
                 }
