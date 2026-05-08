@@ -56,6 +56,10 @@ impl Zset {
         if is_new { 1 } else { 0 }
     }
 
+    pub fn query_length(&self) -> usize {
+        self.sorted.len()
+    }
+
     pub fn query_index(&self, member: String) -> isize {
         self.sorted
             .keys()

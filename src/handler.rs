@@ -1300,6 +1300,26 @@ pub async fn handle_stream(
                                 .write_all(encode(RespValue::Array(resp_value_vec)).as_bytes())
                                 .await;
                         }
+                        [cmd, zset_key] if cmd.to_uppercase() == "ZCARD".to_string() => {
+                            let num_of_elements = {
+                                let db = db.lock().unwrap();
+                                if let Some(redis_value) = db.get(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                        sorted_set.query_length()
+                                    } else {
+                                        0
+                                    }
+                                } else {
+                                    0
+                                }
+                            };
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::Integers(num_of_elements as i64)).as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
