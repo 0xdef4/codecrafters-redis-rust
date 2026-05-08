@@ -259,16 +259,16 @@ pub async fn handle_stream(
                         {
                             match optional_args {
                                 [] => {
-                                    let removed = {
+                                    let removed: Option<String> = {
                                         let mut db = db.lock().unwrap();
 
                                         if let Some(redis_value) = db.get_mut(list_key) {
                                             match &mut redis_value.value {
                                                 ValueType::List(list) => {
                                                     if list.len() == 0 {
-                                                        "".to_string()
+                                                        None
                                                     } else {
-                                                        list.remove(0)
+                                                        Some(list.remove(0))
                                                     }
                                                 }
                                                 _ => {
@@ -276,14 +276,22 @@ pub async fn handle_stream(
                                                 }
                                             }
                                         } else {
-                                            "".to_string()
+                                            None
                                         }
                                     };
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::BulkString(removed)).as_bytes(),
-                                        )
-                                        .await;
+
+                                    if removed.is_none() {
+                                        let _ = wr
+                                            .write_all(encode(RespValue::BulkStringNull).as_bytes())
+                                            .await;
+                                    } else {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::BulkString(removed.unwrap()))
+                                                    .as_bytes(),
+                                            )
+                                            .await;
+                                    }
                                 }
                                 [num_to_remove] => {
                                     let removed = {
@@ -1247,27 +1255,28 @@ pub async fn handle_stream(
                                 .await;
                         }
                         [cmd, zset_key, member] if cmd.to_uppercase() == "ZRANK".to_string() => {
-                            let response = {
+                            let response: Option<isize> = {
                                 let db = db.lock().unwrap();
                                 if let Some(redis_value) = db.get(zset_key) {
                                     if let ValueType::Zset(sorted_set) = &redis_value.value {
-                                        sorted_set.query_index(member.to_string())
+                                        Some(sorted_set.query_index(member.to_string()))
                                     } else {
-                                        -1
+                                        None
                                     }
                                 } else {
-                                    -1
+                                    None
                                 }
                             };
 
-                            if response == -1 {
+                            if response.is_none() {
                                 let _ = wr
                                     .write_all(encode(RespValue::BulkStringNull).as_bytes())
                                     .await;
                             } else {
                                 let _ = wr
                                     .write_all(
-                                        encode(RespValue::Integers(response as i64)).as_bytes(),
+                                        encode(RespValue::Integers(response.unwrap() as i64))
+                                            .as_bytes(),
                                     )
                                     .await;
                             }
