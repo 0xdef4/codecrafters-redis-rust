@@ -64,13 +64,12 @@ impl Zset {
         *self.scores.get(&member).unwrap()
     }
 
-    pub fn query_index(&self, member: String) -> isize {
+    pub fn query_index(&self, member: String) -> Option<usize> {
         self.sorted
             .keys()
             .enumerate()
             .find(|(_, (_, m))| m == &member)
-            .map(|(index, _)| index as isize)
-            .unwrap_or(-1)
+            .map(|(index, _)| index)
     }
 
     pub fn query_range(&self, start_index: i64, stop_index: i64) -> Vec<String> {
