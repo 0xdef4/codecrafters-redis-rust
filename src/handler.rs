@@ -280,17 +280,22 @@ pub async fn handle_stream(
                                         }
                                     };
 
-                                    if removed.is_none() {
-                                        let _ = wr
-                                            .write_all(encode(RespValue::BulkStringNull).as_bytes())
-                                            .await;
-                                    } else {
-                                        let _ = wr
-                                            .write_all(
-                                                encode(RespValue::BulkString(removed.unwrap()))
-                                                    .as_bytes(),
-                                            )
-                                            .await;
+                                    match removed {
+                                        Some(removed) => {
+                                            let _ = wr
+                                                .write_all(
+                                                    encode(RespValue::BulkString(removed))
+                                                        .as_bytes(),
+                                                )
+                                                .await;
+                                        }
+                                        None => {
+                                            let _ = wr
+                                                .write_all(
+                                                    encode(RespValue::BulkStringNull).as_bytes(),
+                                                )
+                                                .await;
+                                        }
                                     }
                                 }
                                 [num_to_remove] => {
@@ -1268,17 +1273,19 @@ pub async fn handle_stream(
                                 }
                             };
 
-                            if response.is_none() {
-                                let _ = wr
-                                    .write_all(encode(RespValue::BulkStringNull).as_bytes())
-                                    .await;
-                            } else {
-                                let _ = wr
-                                    .write_all(
-                                        encode(RespValue::Integers(response.unwrap() as i64))
-                                            .as_bytes(),
-                                    )
-                                    .await;
+                            match response {
+                                Some(rank) => {
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::Integers(rank as i64)).as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                None => {
+                                    let _ = wr
+                                        .write_all(encode(RespValue::BulkStringNull).as_bytes())
+                                        .await;
+                                }
                             }
                         }
                         [cmd, zset_key, start_index, stop_index]
@@ -1343,17 +1350,20 @@ pub async fn handle_stream(
                                 }
                             };
 
-                            if score.is_none() {
-                                let _ = wr
-                                    .write_all(encode(RespValue::BulkStringNull).as_bytes())
-                                    .await;
-                            } else {
-                                let _ = wr
-                                    .write_all(
-                                        encode(RespValue::BulkString(score.unwrap().to_string()))
-                                            .as_bytes(),
-                                    )
-                                    .await;
+                            match score {
+                                Some(score) => {
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::BulkString(score.to_string()))
+                                                .as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                None => {
+                                    let _ = wr
+                                        .write_all(encode(RespValue::BulkStringNull).as_bytes())
+                                        .await;
+                                }
                             }
                         }
                         _ => unreachable!(),
