@@ -8,10 +8,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::db::Zset;
 use crate::{
-    Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, decode_arrays,
-    encode, handle_subscribe_loop,
+    Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
+    decode_arrays, encode, handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
 };
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1391,7 +1390,31 @@ pub async fn handle_stream(
                         [cmd, key, longitude, latitude, member]
                             if cmd.to_uppercase() == "GEOADD".to_string() =>
                         {
-                            let _ = wr.write(encode(RespValue::Integers(1)).as_bytes()).await;
+                            if !is_valid_longitude(longitude.parse().unwrap()) {
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleError(format!(
+                                            "ERR invalid longitude"
+                                        )))
+                                        .as_bytes(),
+                                    )
+                                    .await;
+                            }
+
+                            if !is_valid_latitude(latitude.parse().unwrap()) {
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleError(format!(
+                                            "ERR invalid latitude"
+                                        )))
+                                        .as_bytes(),
+                                    )
+                                    .await;
+                            }
+
+                            let _ = wr
+                                .write_all(encode(RespValue::Integers(1)).as_bytes())
+                                .await;
                         }
                         _ => unreachable!(),
                     }

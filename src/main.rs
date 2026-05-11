@@ -8,6 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 mod db;
+mod geospatial;
 mod handler;
 mod pubsub;
 mod rdb;
@@ -15,6 +16,7 @@ mod replication;
 mod resp;
 
 use db::*;
+use geospatial::*;
 use handler::*;
 use pubsub::*;
 use rdb::*;
