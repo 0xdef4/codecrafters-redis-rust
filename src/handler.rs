@@ -1399,6 +1399,7 @@ pub async fn handle_stream(
                                         .as_bytes(),
                                     )
                                     .await;
+                                return;
                             }
 
                             if !is_valid_latitude(latitude.parse().unwrap()) {
@@ -1410,6 +1411,7 @@ pub async fn handle_stream(
                                         .as_bytes(),
                                     )
                                     .await;
+                                return;
                             }
 
                             let _ = wr
