@@ -1388,6 +1388,11 @@ pub async fn handle_stream(
                                 )
                                 .await;
                         }
+                        [cmd, key, longitude, latitude, member]
+                            if cmd.to_uppercase() == "GEOADD".to_string() =>
+                        {
+                            let _ = wr.write(encode(RespValue::Integers(1)).as_bytes()).await;
+                        }
                         _ => unreachable!(),
                     }
                 }
