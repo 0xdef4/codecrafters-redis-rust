@@ -1387,7 +1387,7 @@ pub async fn handle_stream(
                                 )
                                 .await;
                         }
-                        [cmd, key, longitude, latitude, member]
+                        [cmd, zset_key, longitude, latitude, member]
                             if cmd.to_uppercase() == "GEOADD".to_string() =>
                         {
                             if !is_valid_longitude(longitude.parse().unwrap()) {
@@ -1414,8 +1414,31 @@ pub async fn handle_stream(
                                 continue;
                             }
 
+                            let num_new_members_added = {
+                                let mut db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get_mut(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &mut redis_value.value {
+                                        sorted_set.add(0.0, member.to_string())
+                                    } else {
+                                        unimplemented!()
+                                    }
+                                } else {
+                                    let mut zset = Zset::new();
+                                    zset.add(0.0, member.to_string());
+
+                                    let redis_value = RedisValue::new(ValueType::Zset(zset), None);
+
+                                    db.insert(zset_key.to_string(), redis_value);
+                                    1
+                                }
+                            };
+
                             let _ = wr
-                                .write_all(encode(RespValue::Integers(1)).as_bytes())
+                                .write_all(
+                                    encode(RespValue::Integers(num_new_members_added as i64))
+                                        .as_bytes(),
+                                )
                                 .await;
                         }
                         _ => unreachable!(),
