@@ -10,7 +10,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::{
     Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
-    decode_arrays, encode, handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
+    decode_arrays, encode,
+    geospatial::decode::{Coordinates, decode as geo_decode},
+    geospatial::encode::encode as geo_encode,
+    handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
 };
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1419,13 +1422,25 @@ pub async fn handle_stream(
 
                                 if let Some(redis_value) = db.get_mut(zset_key) {
                                     if let ValueType::Zset(sorted_set) = &mut redis_value.value {
-                                        sorted_set.add(0.0, member.to_string())
+                                        sorted_set.add(
+                                            geo_encode(
+                                                latitude.parse().unwrap(),
+                                                longitude.parse().unwrap(),
+                                            ) as f64,
+                                            member.to_string(),
+                                        )
                                     } else {
                                         unimplemented!()
                                     }
                                 } else {
                                     let mut zset = Zset::new();
-                                    zset.add(0.0, member.to_string());
+                                    zset.add(
+                                        geo_encode(
+                                            latitude.parse().unwrap(),
+                                            longitude.parse().unwrap(),
+                                        ) as f64,
+                                        member.to_string(),
+                                    );
 
                                     let redis_value = RedisValue::new(ValueType::Zset(zset), None);
 

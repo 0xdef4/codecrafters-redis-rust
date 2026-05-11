@@ -1,3 +1,14 @@
+pub mod decode;
+pub mod encode;
+
+const MIN_LATITUDE: f64 = -85.05112878;
+const MAX_LATITUDE: f64 = 85.05112878;
+const MIN_LONGITUDE: f64 = -180.0;
+const MAX_LONGITUDE: f64 = 180.0;
+
+const LATITUDE_RANGE: f64 = MAX_LATITUDE - MIN_LATITUDE;
+const LONGITUDE_RANGE: f64 = MAX_LONGITUDE - MIN_LONGITUDE;
+
 pub fn is_valid_longitude(longitude: f64) -> bool {
     // Valid longitudes are from -180° to +180°
     let mut is_valid_longitude = true;
