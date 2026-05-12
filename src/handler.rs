@@ -32,7 +32,6 @@ pub async fn handle_stream(
     let mut in_multi: bool = false;
     let mut command_queue: Vec<Vec<String>> = Vec::new();
     let mut subscribed_channels: HashSet<String> = HashSet::new();
-
     let mut master_repl_offset: usize = 0;
 
     let (rd, mut wr) = stream.into_split();

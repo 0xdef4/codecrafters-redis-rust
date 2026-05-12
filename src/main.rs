@@ -1,5 +1,4 @@
 use tokio::net::TcpListener;
-use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
@@ -30,8 +29,6 @@ pub struct Config {
     pub dir: Option<String>,
     pub dbfilename: Option<String>,
 }
-
-pub type Pubsub = Arc<Mutex<HashMap<String, Vec<(u64, Sender<(String, String)>)>>>>;
 
 #[tokio::main]
 async fn main() {
