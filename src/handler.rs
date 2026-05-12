@@ -1502,7 +1502,6 @@ pub async fn handle_stream(
                         [cmd, zset_key, origin, destination]
                             if cmd.to_uppercase() == "GEODIST".to_string() =>
                         {
-                            // get coord of origin
                             let origin_score = {
                                 let db = db.lock().unwrap();
 
@@ -1519,7 +1518,6 @@ pub async fn handle_stream(
 
                             let origin_coord = geo_decode(origin_score.unwrap() as u64);
 
-                            // get coord of dest
                             let dest_score = {
                                 let db = db.lock().unwrap();
 
@@ -1536,7 +1534,6 @@ pub async fn handle_stream(
 
                             let dest_coord = geo_decode(dest_score.unwrap() as u64);
 
-                            // use haversine to get f64
                             let dist = haversine(
                                 origin_coord.convert_coord_to_point(),
                                 dest_coord.convert_coord_to_point(),
