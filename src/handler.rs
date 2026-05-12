@@ -1479,8 +1479,10 @@ pub async fn handle_stream(
                                         let coordinates = geo_decode(score as u64);
 
                                         let inner = RespValue::Array(vec![
-                                            RespValue::BulkString("0".to_string()),
-                                            RespValue::BulkString("0".to_string()),
+                                            RespValue::BulkString(
+                                                coordinates.longitude.to_string(),
+                                            ),
+                                            RespValue::BulkString(coordinates.latitude.to_string()),
                                         ]);
 
                                         output.push(inner);
