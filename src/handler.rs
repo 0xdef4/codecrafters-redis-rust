@@ -11,8 +11,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::{
     Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
     decode_arrays, encode, geospatial::decode::decode as geo_decode,
-    geospatial::encode::encode as geo_encode, handle_subscribe_loop, is_valid_latitude,
-    is_valid_longitude,
+    geospatial::distance::haversine, geospatial::encode::encode as geo_encode,
+    handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
 };
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1495,6 +1495,56 @@ pub async fn handle_stream(
 
                             let _ = wr
                                 .write_all(encode(RespValue::Array(output)).as_bytes())
+                                .await;
+                        }
+                        [cmd, zset_key, origin, destination]
+                            if cmd.to_uppercase() == "GEODIST".to_string() =>
+                        {
+                            // get coord of origin
+                            let origin_score = {
+                                let db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                        sorted_set.query_score(origin.to_string())
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            let origin_coord = geo_decode(origin_score.unwrap() as u64);
+
+                            // get coord of dest
+                            let dest_score = {
+                                let db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                        sorted_set.query_score(destination.to_string())
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            let dest_coord = geo_decode(dest_score.unwrap() as u64);
+
+                            // use haversine to get f64
+                            let dist = haversine(
+                                origin_coord.convert_coord_to_point(),
+                                dest_coord.convert_coord_to_point(),
+                            );
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::BulkString(format!("{:.4}", dist)))
+                                        .as_bytes(),
+                                )
                                 .await;
                         }
                         _ => unreachable!(),

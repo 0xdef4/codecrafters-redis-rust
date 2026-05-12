@@ -1,3 +1,4 @@
+use crate::distance::Point;
 use crate::geospatial::{LATITUDE_RANGE, LONGITUDE_RANGE, MIN_LATITUDE, MIN_LONGITUDE};
 
 #[derive(Debug)]
@@ -11,6 +12,13 @@ impl Coordinates {
         Self {
             latitude,
             longitude,
+        }
+    }
+
+    pub fn convert_coord_to_point(&self) -> Point {
+        Point {
+            lat: self.latitude,
+            lon: self.longitude,
         }
     }
 }

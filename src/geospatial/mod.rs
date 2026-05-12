@@ -1,4 +1,5 @@
 pub mod decode;
+pub mod distance;
 pub mod encode;
 
 const MIN_LATITUDE: f64 = -85.05112878;
