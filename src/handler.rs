@@ -10,10 +10,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::{
     Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
-    decode_arrays, encode,
-    geospatial::decode::{Coordinates, decode as geo_decode},
-    geospatial::encode::encode as geo_encode,
-    handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
+    decode_arrays, encode, geospatial::decode::decode as geo_decode,
+    geospatial::encode::encode as geo_encode, handle_subscribe_loop, is_valid_latitude,
+    is_valid_longitude,
 };
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1455,6 +1454,47 @@ pub async fn handle_stream(
                                         .as_bytes(),
                                 )
                                 .await;
+                        }
+                        [cmd, zset_key, member] if cmd.to_uppercase() == "GEOPOS".to_string() => {
+                            let score: Option<f64> = {
+                                let db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                        Some(sorted_set.query_score(member.to_string()))
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            match score {
+                                Some(score) => {
+                                    // decode score back to coordinates
+                                    let coordinates = geo_decode(score as u64);
+
+                                    // and respond
+                                    let _ = wr
+                                        .write_all(
+                                            encode(RespValue::Array(vec![
+                                                RespValue::BulkString(
+                                                    coordinates.latitude.to_string(),
+                                                ),
+                                                RespValue::BulkString(
+                                                    coordinates.longitude.to_string(),
+                                                ),
+                                            ]))
+                                            .as_bytes(),
+                                        )
+                                        .await;
+                                }
+                                None => {
+                                    let _ =
+                                        wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
+                                }
+                            }
                         }
                         _ => unreachable!(),
                     }

@@ -2,8 +2,8 @@ use crate::geospatial::{LATITUDE_RANGE, LONGITUDE_RANGE, MIN_LATITUDE, MIN_LONGI
 
 #[derive(Debug)]
 pub struct Coordinates {
-    latitude: f64,
-    longitude: f64,
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 impl Coordinates {
