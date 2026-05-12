@@ -8,11 +8,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::geospatial::{
+    coordinates::Coordinates, decode::decode as geo_decode, distance::haversine,
+    encode::encode as geo_encode,
+};
 use crate::{
     Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
-    decode_arrays, encode, geospatial::decode::decode as geo_decode,
-    geospatial::distance::haversine, geospatial::encode::encode as geo_encode,
-    handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
+    decode_arrays, encode, handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
 };
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1546,6 +1548,55 @@ pub async fn handle_stream(
                                         .as_bytes(),
                                 )
                                 .await;
+                        }
+                        [
+                            cmd,
+                            zset_key,
+                            option_1,
+                            longitude,
+                            latitude,
+                            option_2,
+                            radius,
+                            unit,
+                        ] if cmd.to_uppercase() == "GEOSEARCH".to_string()
+                            && option_1.to_uppercase() == "FROMLONLAT".to_string()
+                            && option_2.to_uppercase() == "BYRADIUS".to_string() =>
+                        {
+                            let center_coord = Coordinates::new(
+                                latitude.parse().unwrap(),
+                                longitude.parse().unwrap(),
+                            );
+                            let radius_meter: f64 = radius.parse().unwrap();
+
+                            let members_within_radius: Option<Vec<String>> = {
+                                let db = db.lock().unwrap();
+
+                                if let Some(redis_value) = db.get(zset_key) {
+                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                        Some(sorted_set.search_members_within_radius(
+                                            center_coord,
+                                            radius_meter,
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            match members_within_radius {
+                                Some(members_within_radius) => {
+                                    let resp_vec = members_within_radius
+                                        .iter()
+                                        .map(|e| RespValue::BulkString(e.to_string()))
+                                        .collect::<Vec<_>>();
+                                    let _ = wr
+                                        .write_all(encode(RespValue::Array(resp_vec)).as_bytes())
+                                        .await;
+                                }
+                                None => {}
+                            }
                         }
                         _ => unreachable!(),
                     }

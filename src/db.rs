@@ -2,6 +2,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use crate::geospatial::coordinates::Coordinates;
+use crate::geospatial::decode::decode;
+use crate::geospatial::distance::haversine;
 use crate::resp::RespValue;
 
 pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
@@ -107,6 +110,26 @@ impl Zset {
             .take((stop - start + 1) as usize)
             .map(|((_, member), _)| member.clone())
             .collect()
+    }
+
+    pub fn search_members_within_radius(
+        &self,
+        center_coord: Coordinates,
+        radius: f64,
+    ) -> Vec<String> {
+        let mut members_within_radius = vec![];
+        for (key, value) in self.scores.iter() {
+            let distance = haversine(
+                center_coord.convert_coord_to_point(),
+                decode(*value as u64).convert_coord_to_point(),
+            );
+
+            if distance < radius {
+                members_within_radius.push(key.to_string());
+            }
+        }
+
+        members_within_radius
     }
 }
 

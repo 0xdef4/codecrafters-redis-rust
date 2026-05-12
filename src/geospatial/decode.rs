@@ -1,27 +1,5 @@
-use crate::distance::Point;
+use crate::coordinates::Coordinates;
 use crate::geospatial::{LATITUDE_RANGE, LONGITUDE_RANGE, MIN_LATITUDE, MIN_LONGITUDE};
-
-#[derive(Debug)]
-pub struct Coordinates {
-    pub latitude: f64,
-    pub longitude: f64,
-}
-
-impl Coordinates {
-    pub fn new(latitude: f64, longitude: f64) -> Self {
-        Self {
-            latitude,
-            longitude,
-        }
-    }
-
-    pub fn convert_coord_to_point(&self) -> Point {
-        Point {
-            lat: self.latitude,
-            lon: self.longitude,
-        }
-    }
-}
 
 fn compact_int64_to_int32(v: u64) -> u32 {
     let mut result = v & 0x5555555555555555;

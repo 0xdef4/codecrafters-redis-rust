@@ -1,3 +1,4 @@
+pub mod coordinates;
 pub mod decode;
 pub mod distance;
 pub mod encode;
