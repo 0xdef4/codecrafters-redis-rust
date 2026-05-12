@@ -1342,7 +1342,7 @@ pub async fn handle_stream(
                                 let db = db.lock().unwrap();
                                 if let Some(redis_value) = db.get(zset_key) {
                                     if let ValueType::Zset(sorted_set) = &redis_value.value {
-                                        Some(sorted_set.query_score(member.to_string()))
+                                        sorted_set.query_score(member.to_string())
                                     } else {
                                         None
                                     }
@@ -1455,46 +1455,45 @@ pub async fn handle_stream(
                                 )
                                 .await;
                         }
-                        [cmd, zset_key, member] if cmd.to_uppercase() == "GEOPOS".to_string() => {
-                            let score: Option<f64> = {
-                                let db = db.lock().unwrap();
+                        [cmd, zset_key, members @ ..]
+                            if cmd.to_uppercase() == "GEOPOS".to_string() =>
+                        {
+                            let mut output = vec![];
+                            for member in members {
+                                let score: Option<f64> = {
+                                    let db = db.lock().unwrap();
 
-                                if let Some(redis_value) = db.get(zset_key) {
-                                    if let ValueType::Zset(sorted_set) = &redis_value.value {
-                                        Some(sorted_set.query_score(member.to_string()))
+                                    if let Some(redis_value) = db.get(zset_key) {
+                                        if let ValueType::Zset(sorted_set) = &redis_value.value {
+                                            sorted_set.query_score(member.to_string())
+                                        } else {
+                                            None
+                                        }
                                     } else {
                                         None
                                     }
-                                } else {
-                                    None
-                                }
-                            };
+                                };
 
-                            match score {
-                                Some(score) => {
-                                    // decode score back to coordinates
-                                    let coordinates = geo_decode(score as u64);
+                                match score {
+                                    Some(score) => {
+                                        let coordinates = geo_decode(score as u64);
 
-                                    // and respond
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString(
-                                                    coordinates.latitude.to_string(),
-                                                ),
-                                                RespValue::BulkString(
-                                                    coordinates.longitude.to_string(),
-                                                ),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
-                                }
-                                None => {
-                                    let _ =
-                                        wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
+                                        let inner = RespValue::Array(vec![
+                                            RespValue::BulkString("0".to_string()),
+                                            RespValue::BulkString("0".to_string()),
+                                        ]);
+
+                                        output.push(inner);
+                                    }
+                                    None => {
+                                        output.push(RespValue::ArrayNull);
+                                    }
                                 }
                             }
+
+                            let _ = wr
+                                .write_all(encode(RespValue::Array(output)).as_bytes())
+                                .await;
                         }
                         _ => unreachable!(),
                     }
