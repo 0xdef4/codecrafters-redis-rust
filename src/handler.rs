@@ -1595,6 +1595,16 @@ pub async fn handle_stream(
                                 None => {}
                             }
                         }
+                        [cmd, sub_cmd]
+                            if cmd.to_uppercase() == "ACL".to_string()
+                                && sub_cmd.to_uppercase() == "WHOAMI".to_string() =>
+                        {
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::BulkString("default".to_string())).as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
