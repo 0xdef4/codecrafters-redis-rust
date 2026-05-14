@@ -6,6 +6,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+mod acl;
 mod db;
 mod geospatial;
 mod handler;
@@ -14,6 +15,7 @@ mod rdb;
 mod replication;
 mod resp;
 
+use acl::*;
 use db::*;
 use geospatial::*;
 use handler::*;
@@ -79,6 +81,10 @@ async fn main() {
     let config = Arc::new(config);
     let pubsub = Arc::new(Mutex::new(HashMap::new()));
 
+    let mut acl = HashMap::new();
+    acl.insert("default".to_string(), AclUser::new());
+    let acl_db: AclDb = Arc::new(Mutex::new(acl));
+
     if config.replicaof.is_some() {
         let db = Arc::clone(&db);
         let config = Arc::clone(&config);
@@ -117,6 +123,7 @@ async fn main() {
                 let replicas = Arc::clone(&replicas);
                 let config = Arc::clone(&config);
                 let pubsub = Arc::clone(&pubsub);
+                let acl_db = Arc::clone(&acl_db);
 
                 tokio::spawn(async move {
                     handle_stream(
@@ -127,6 +134,7 @@ async fn main() {
                         replicas,
                         config,
                         pubsub,
+                        acl_db,
                     )
                     .await;
                 });

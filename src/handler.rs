@@ -8,12 +8,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use sha2::{Digest, Sha256};
+
 use crate::geospatial::{
     coordinates::Coordinates, decode::decode as geo_decode, distance::haversine,
     encode::encode as geo_encode,
 };
 use crate::{
-    Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
+    AclDb, Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
     decode_arrays, encode, handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
 };
 
@@ -27,6 +29,7 @@ pub async fn handle_stream(
     replicas: Replicas,
     config: Arc<Config>,
     pubsub: Pubsub,
+    acl_db: AclDb,
 ) {
     let client_id = CLIENT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut in_multi: bool = false;
@@ -1608,20 +1611,65 @@ pub async fn handle_stream(
                             if cmd.to_uppercase() == "ACL".to_string()
                                 && sub_cmd.to_uppercase() == "GETUSER".to_string() =>
                         {
+                            let user = {
+                                let acl_db = acl_db.lock().unwrap();
+
+                                if let Some(user) = acl_db.get(username) {
+                                    user.clone()
+                                } else {
+                                    unimplemented!()
+                                }
+                            };
+
                             let _ = wr
                                 .write_all(
                                     encode(RespValue::Array(vec![
                                         RespValue::BulkString("flags".to_string()),
-                                        RespValue::Array(vec![RespValue::BulkString(
-                                            "nopass".to_string(),
-                                        )]),
+                                        RespValue::Array(
+                                            user.get_flags()
+                                                .iter()
+                                                .map(|e| RespValue::BulkString(e.to_string()))
+                                                .collect(),
+                                        ),
                                         RespValue::BulkString("passwords".to_string()),
-                                        RespValue::Array(vec![]),
+                                        RespValue::Array(
+                                            user.get_passwords()
+                                                .iter()
+                                                .map(|e| RespValue::BulkString(e.to_string()))
+                                                .collect(),
+                                        ),
                                     ]))
                                     .as_bytes(),
                                 )
                                 .await;
                         }
+                        [cmd, sub_cmd, username, rest @ ..]
+                            if cmd.to_uppercase() == "ACL".to_string()
+                                && sub_cmd.to_uppercase() == "SETUSER".to_string() =>
+                        {
+                            for ele in rest {
+                                if let Some(password) = ele.strip_prefix(">") {
+                                    let mut hasher = Sha256::new();
+                                    hasher.update(password.as_bytes());
+                                    let hash = hasher.finalize();
+                                    let hash = hex::encode(hash);
+
+                                    {
+                                        let mut acl_db = acl_db.lock().unwrap();
+                                        if let Some(user) = acl_db.get_mut(username) {
+                                            user.store_password(hash.to_lowercase());
+                                        }
+                                    }
+                                }
+                            }
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::SimpleString("OK".to_string())).as_bytes(),
+                                )
+                                .await;
+                        }
+
                         _ => unreachable!(),
                     }
                 }
