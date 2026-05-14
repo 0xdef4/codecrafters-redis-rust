@@ -1612,7 +1612,9 @@ pub async fn handle_stream(
                                 .write_all(
                                     encode(RespValue::Array(vec![
                                         RespValue::BulkString("flags".to_string()),
-                                        RespValue::Array(vec![]),
+                                        RespValue::Array(vec![RespValue::BulkString(
+                                            "nopass".to_string(),
+                                        )]),
                                     ]))
                                     .as_bytes(),
                                 )
