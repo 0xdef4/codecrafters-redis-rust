@@ -1604,6 +1604,20 @@ pub async fn handle_stream(
                                 )
                                 .await;
                         }
+                        [cmd, sub_cmd, username]
+                            if cmd.to_uppercase() == "ACL".to_string()
+                                && sub_cmd.to_uppercase() == "GETUSER".to_string() =>
+                        {
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::Array(vec![
+                                        RespValue::BulkString("flags".to_string()),
+                                        RespValue::Array(vec![]),
+                                    ]))
+                                    .as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
