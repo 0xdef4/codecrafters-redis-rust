@@ -1615,6 +1615,8 @@ pub async fn handle_stream(
                                         RespValue::Array(vec![RespValue::BulkString(
                                             "nopass".to_string(),
                                         )]),
+                                        RespValue::BulkString("passwords".to_string()),
+                                        RespValue::Array(vec![]),
                                     ]))
                                     .as_bytes(),
                                 )
