@@ -2,8 +2,6 @@ use tokio::net::TcpListener;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 mod acl;
@@ -22,7 +20,6 @@ use db::*;
 use geospatial::*;
 use handler::*;
 use pubsub::*;
-use rdb::*;
 use replication::*;
 use resp::*;
 
@@ -42,28 +39,6 @@ async fn main() {
 
     rdb::load_if_exists(&db, &config);
     replication::start_if_replica(&db, Arc::clone(&config));
-
-    // TODO : check
-    // if config.dir.is_some() && config.dbfilename.is_some() {
-    //     let dir = config.dir.as_ref().unwrap();
-    //     let dbfilename = config.dbfilename.as_ref().unwrap();
-
-    //     let path_string = format!("{}/{}", dir, dbfilename);
-    //     let path = Path::new(path_string.as_str());
-
-    //     let f = File::open(path);
-
-    //     match f {
-    //         Ok(mut rdb_file) => {
-    //             // RDB 파일 존재하면 파싱해서 db에 insert
-    //             let db = Arc::clone(&db);
-    //             parse_rdb(&mut rdb_file, db);
-    //         }
-    //         Err(_) => {
-    //             // do nothing
-    //         }
-    //     }
-    // }
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await
