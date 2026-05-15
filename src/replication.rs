@@ -217,3 +217,14 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
         }
     }
 }
+
+pub fn start_if_replica(db: &Db, config: Arc<Config>) {
+    if config.replicaof.is_none() {
+        return;
+    }
+
+    let db = Arc::clone(db);
+    tokio::spawn(async move {
+        start_replica_handshake(config, db).await;
+    });
+}

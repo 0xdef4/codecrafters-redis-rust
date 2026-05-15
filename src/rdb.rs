@@ -1,6 +1,8 @@
-use crate::{Db, RedisValue, ValueType};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs::File, io::Read};
+
+use crate::{Config, Db, RedisValue, ValueType};
 
 // REDIS0011 헤더 스킵
 // FA 메타데이터 key/value 스킵
@@ -187,5 +189,17 @@ fn read_string(buffer: &[u8], i: usize) -> (String, usize) {
         let (size, next) = read_size(buffer, i);
         let s = String::from_utf8_lossy(&buffer[next..next + size]).to_string();
         (s, next + size)
+    }
+}
+
+pub fn load_if_exists(db: &Db, config: &Config) {
+    let (Some(dir), Some(filename)) = (&config.dir, &config.dbfilename) else {
+        return;
+    };
+
+    let path = format!("{}/{}", dir, filename);
+
+    if let Ok(mut f) = File::open(&path) {
+        parse_rdb(&mut f, Arc::clone(db));
     }
 }
