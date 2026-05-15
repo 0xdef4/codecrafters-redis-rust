@@ -36,6 +36,15 @@ pub async fn handle_stream(
     let mut command_queue: Vec<Vec<String>> = Vec::new();
     let mut subscribed_channels: HashSet<String> = HashSet::new();
     let mut master_repl_offset: usize = 0;
+    let mut is_authenticated: bool = {
+        let acl_db = acl_db.lock().unwrap();
+
+        if let Some(acl_user) = acl_db.get(&"default".to_string()) {
+            acl_user.get_flags().contains(&"nopass".to_string())
+        } else {
+            false
+        }
+    };
 
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -63,6 +72,18 @@ pub async fn handle_stream(
                         let _ = wr
                             .write_all(
                                 encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes(),
+                            )
+                            .await;
+                        continue;
+                    }
+
+                    if !is_authenticated && cmd_upper != "AUTH" {
+                        let _ = wr
+                            .write_all(
+                                encode(RespValue::SimpleError(
+                                    "NOAUTH Authentication required.".to_string(),
+                                ))
+                                .as_bytes(),
                             )
                             .await;
                         continue;
@@ -1692,6 +1713,8 @@ pub async fn handle_stream(
                                             .as_bytes(),
                                     )
                                     .await;
+
+                                is_authenticated = true;
                             } else {
                                 let _ = wr
                                     .write_all(
