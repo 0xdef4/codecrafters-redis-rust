@@ -1669,7 +1669,38 @@ pub async fn handle_stream(
                                 )
                                 .await;
                         }
+                        [cmd, username, password] if cmd.to_uppercase() == "AUTH".to_string() => {
+                            let user = {
+                                let acl_db = acl_db.lock().unwrap();
 
+                                if let Some(user) = acl_db.get(username) {
+                                    user.clone()
+                                } else {
+                                    unimplemented!()
+                                }
+                            };
+
+                            let mut hasher = Sha256::new();
+                            hasher.update(password.as_bytes());
+                            let hash = hasher.finalize();
+                            let password_hash_to_validate = hex::encode(hash);
+
+                            if user.is_valid_password(password_hash_to_validate) {
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleString("OK".to_string()))
+                                            .as_bytes(),
+                                    )
+                                    .await;
+                            } else {
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleError("WRONGPASS invalid username-password pair or user is disabled.".to_string()))
+                                            .as_bytes(),
+                                    )
+                                    .await;
+                            }
+                        }
                         _ => unreachable!(),
                     }
                 }

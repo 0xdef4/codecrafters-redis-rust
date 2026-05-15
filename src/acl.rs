@@ -39,4 +39,12 @@ impl AclUser {
     pub fn get_passwords(&self) -> Vec<String> {
         self.passwords.clone()
     }
+
+    pub fn is_valid_password(&self, password_hash: String) -> bool {
+        if self.flags.contains(&"nopass".to_string()) {
+            return true;
+        }
+
+        self.passwords.contains(&password_hash)
+    }
 }
