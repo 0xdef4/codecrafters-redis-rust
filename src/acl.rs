@@ -3,15 +3,17 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use sha2::{Digest, Sha256};
+
 // ACL DB (username -> AclUser)
 pub type AclDb = Arc<Mutex<HashMap<String, AclUser>>>;
 
 #[derive(Debug, Clone)]
 pub struct AclUser {
-    flags: Vec<String>,     // "on", "nopass", "allkeys" etc
+    flags: Vec<String>, // "on", "nopass", "allkeys" etc
     passwords: Vec<String>, // hashed passwords
-    commands: String,       // "@all", "-@dangerous" etc
-    keys: String,           // "*" etc
+                        // commands: String,       // "@all", "-@dangerous" etc
+                        // keys: String,           // "*" etc
 }
 
 impl AclUser {
@@ -19,8 +21,8 @@ impl AclUser {
         Self {
             flags: vec!["nopass".to_string()],
             passwords: vec![],
-            commands: "".to_string(),
-            keys: "".to_string(),
+            // commands: "".to_string(),
+            // keys: "".to_string(),
         }
     }
 
@@ -47,4 +49,13 @@ impl AclUser {
 
         self.passwords.contains(&password_hash)
     }
+}
+
+pub fn sha256_hash(password: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(password.as_bytes());
+    let hash = hasher.finalize();
+    let hash = hex::encode(hash);
+
+    hash
 }

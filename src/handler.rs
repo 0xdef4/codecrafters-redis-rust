@@ -8,8 +8,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use sha2::{Digest, Sha256};
-
 use crate::geospatial::{
     coordinates::Coordinates, decode::decode as geo_decode, distance::haversine,
     encode::encode as geo_encode,
@@ -17,6 +15,7 @@ use crate::geospatial::{
 use crate::{
     AclDb, Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
     decode_arrays, encode, handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
+    sha256_hash,
 };
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1670,10 +1669,7 @@ pub async fn handle_stream(
                         {
                             for ele in rest {
                                 if let Some(password) = ele.strip_prefix(">") {
-                                    let mut hasher = Sha256::new();
-                                    hasher.update(password.as_bytes());
-                                    let hash = hasher.finalize();
-                                    let hash = hex::encode(hash);
+                                    let hash = sha256_hash(password);
 
                                     {
                                         let mut acl_db = acl_db.lock().unwrap();
@@ -1701,10 +1697,7 @@ pub async fn handle_stream(
                                 }
                             };
 
-                            let mut hasher = Sha256::new();
-                            hasher.update(password.as_bytes());
-                            let hash = hasher.finalize();
-                            let password_hash_to_validate = hex::encode(hash);
+                            let password_hash_to_validate = sha256_hash(password);
 
                             if user.is_valid_password(password_hash_to_validate) {
                                 let _ = wr
