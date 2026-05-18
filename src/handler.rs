@@ -9,12 +9,18 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::geospatial::{
-    coordinates::Coordinates, decode::decode as geo_decode, distance::haversine,
-    encode::encode as geo_encode, is_valid_latitude, is_valid_longitude,
+    check_valid::{is_valid_latitude, is_valid_longitude},
+    coordinates::Coordinates,
+    decode::decode as geo_decode,
+    distance::haversine,
+    encode::encode as geo_encode,
 };
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
-use crate::types::{db::Db, db::RedisValue, db::ValueType, stream::StreamEntry, zset::Zset};
-use crate::{AclDb, Config, Pubsub, Replicas, handle_subscribe_loop, sha256_hash};
+use crate::types::{
+    acl::AclDb, db::Db, db::RedisValue, db::ValueType, pubsub::Pubsub, replication::Replicas,
+    stream::StreamEntry, zset::Zset,
+};
+use crate::{Config, acl::sha256_hash, pubsub::handle_subscribe_loop};
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 

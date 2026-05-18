@@ -14,20 +14,22 @@ mod rdb;
 mod replication;
 mod types;
 
-use acl::*;
 use config::*;
 use handler::*;
-use pubsub::*;
-use replication::*;
+
+use crate::types::acl::{AclDb, AclUser};
+use crate::types::db::Db;
+use crate::types::pubsub::Pubsub;
+use crate::types::replication::Replicas;
 
 #[tokio::main]
 async fn main() {
     let config = Arc::new(Config::from_args());
 
-    let db = Arc::new(Mutex::new(HashMap::new()));
+    let db: Db = Arc::new(Mutex::new(HashMap::new()));
     let notify = Arc::new(Notify::new());
     let replicas: Replicas = Arc::new(TokioMutex::new(Vec::new()));
-    let pubsub = Arc::new(Mutex::new(HashMap::new()));
+    let pubsub: Pubsub = Arc::new(Mutex::new(HashMap::new()));
     let acl_db: AclDb = Arc::new(Mutex::new({
         let mut acl = HashMap::new();
         acl.insert("default".to_string(), AclUser::new());

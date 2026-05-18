@@ -1,7 +1,5 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::sync::Mutex as TokioMutex;
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -9,8 +7,6 @@ use std::time::{Duration, Instant};
 use crate::Config;
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
 use crate::types::db::{Db, RedisValue, ValueType};
-
-pub type Replicas = Arc<TokioMutex<Vec<(OwnedWriteHalf, OwnedReadHalf)>>>;
 
 pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
     if let Some((master_ip, master_port)) = config.replicaof.as_ref().unwrap().split_once(' ') {

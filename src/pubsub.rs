@@ -1,14 +1,11 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
 
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
 
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
-
-pub type Pubsub = Arc<Mutex<HashMap<String, Vec<(u64, Sender<(String, String)>)>>>>;
+use crate::types::pubsub::Pubsub;
 
 pub async fn handle_subscribe_loop(
     mut wr: OwnedWriteHalf,
