@@ -2,7 +2,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs::File, io::Read};
 
-use crate::{Config, Db, RedisValue, ValueType};
+use crate::Config;
+use crate::types::db::{Db, RedisValue, ValueType};
 
 // REDIS0011 헤더 스킵
 // FA 메타데이터 key/value 스킵

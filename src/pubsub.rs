@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use crate::{RespValue, decode_arrays, encode};
+use crate::protocol::resp::{RespValue, decode_arrays, encode};
 
 pub type Pubsub = Arc<Mutex<HashMap<String, Vec<(u64, Sender<(String, String)>)>>>>;
 

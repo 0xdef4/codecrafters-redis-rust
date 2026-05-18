@@ -10,13 +10,11 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::geospatial::{
     coordinates::Coordinates, decode::decode as geo_decode, distance::haversine,
-    encode::encode as geo_encode,
+    encode::encode as geo_encode, is_valid_latitude, is_valid_longitude,
 };
-use crate::{
-    AclDb, Config, Db, Pubsub, RedisValue, Replicas, RespValue, StreamEntry, ValueType, Zset,
-    decode_arrays, encode, handle_subscribe_loop, is_valid_latitude, is_valid_longitude,
-    sha256_hash,
-};
+use crate::protocol::resp::{RespValue, decode_arrays, encode};
+use crate::types::{db::Db, db::RedisValue, db::ValueType, stream::StreamEntry, zset::Zset};
+use crate::{AclDb, Config, Pubsub, Replicas, handle_subscribe_loop, sha256_hash};
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 

@@ -1,35 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
-use crate::geospatial::coordinates::Coordinates;
-use crate::geospatial::decode::decode;
-use crate::geospatial::distance::haversine;
-use crate::resp::RespValue;
-
-pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
-
-#[allow(unused)]
-pub enum ValueType {
-    String(String),
-    List(Vec<String>),
-    Stream(Vec<StreamEntry>),
-    Set(),
-    Zset(Zset),
-    Hash(),
-    Vectorset(),
-}
-
-pub struct RedisValue {
-    pub value: ValueType,
-    pub expires_at: Option<Instant>,
-}
-
-impl RedisValue {
-    pub fn new(value: ValueType, expires_at: Option<Instant>) -> Self {
-        Self { value, expires_at }
-    }
-}
+use crate::geospatial::{coordinates::Coordinates, decode::decode, distance::haversine};
 
 pub struct Zset {
     sorted: BTreeMap<(u64, String), f64>,
@@ -139,38 +110,5 @@ fn score_bits(score: f64) -> u64 {
         bits | (1 << 63)
     } else {
         !bits
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct StreamEntry {
-    id: String,
-    fields: Vec<(String, String)>,
-}
-
-impl StreamEntry {
-    pub fn new(id: String, fields: Vec<(String, String)>) -> Self {
-        Self { id, fields }
-    }
-
-    pub fn get_entry_id(&self) -> String {
-        self.id.clone()
-    }
-
-    pub fn get_fields(&self) -> Vec<(String, String)> {
-        self.fields.clone()
-    }
-
-    pub fn to_resp_value(&self) -> RespValue {
-        let mut output = Vec::new();
-        output.push(RespValue::BulkString(self.get_entry_id()));
-        let mut fields_vec = Vec::new();
-        for e in self.get_fields() {
-            fields_vec.push(RespValue::BulkString(e.0));
-            fields_vec.push(RespValue::BulkString(e.1));
-        }
-        output.push(RespValue::Array(fields_vec));
-
-        RespValue::Array(output)
     }
 }

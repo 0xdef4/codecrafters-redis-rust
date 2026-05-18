@@ -6,7 +6,9 @@ use tokio::sync::Mutex as TokioMutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::{Config, Db, RedisValue, RespValue, ValueType, decode_arrays, encode};
+use crate::Config;
+use crate::protocol::resp::{RespValue, decode_arrays, encode};
+use crate::types::db::{Db, RedisValue, ValueType};
 
 pub type Replicas = Arc<TokioMutex<Vec<(OwnedWriteHalf, OwnedReadHalf)>>>;
 
