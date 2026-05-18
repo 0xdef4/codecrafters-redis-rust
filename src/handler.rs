@@ -48,6 +48,7 @@ pub async fn handle_stream(
             false
         }
     };
+    let mut watched_keys: Vec<String> = Vec::new();
 
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -70,6 +71,7 @@ pub async fn handle_stream(
                         && cmd_upper != "EXEC"
                         && cmd_upper != "MULTI"
                         && cmd_upper != "DISCARD"
+                        && cmd_upper != "WATCH"
                     {
                         command_queue.push(resp_array.clone());
                         let _ = wr
@@ -1723,12 +1725,28 @@ pub async fn handle_stream(
                         }
                         [cmd, key] if cmd.to_uppercase() == "WATCH".to_string() => {
                             // TODO
+                            if in_multi {
+                                // Return a RESP error like: -ERR WATCH inside MULTI is not allowed\r\n.
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleError(
+                                            "ERR WATCH inside MULTI is not allowed".to_string(),
+                                        ))
+                                        .as_bytes(),
+                                    )
+                                    .await;
+                            } else {
+                                // Add the key to the connection's collection of watched keys
+                                watched_keys.push(key.to_string());
 
-                            let _ = wr
-                                .write_all(
-                                    encode(RespValue::SimpleString("OK".to_string())).as_bytes(),
-                                )
-                                .await;
+                                // Return OK as a simple string
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleString("OK".to_string()))
+                                            .as_bytes(),
+                                    )
+                                    .await;
+                            }
                         }
                         _ => unreachable!(),
                     }
