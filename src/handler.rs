@@ -1721,6 +1721,15 @@ pub async fn handle_stream(
                                     .await;
                             }
                         }
+                        [cmd, key] if cmd.to_uppercase() == "WATCH".to_string() => {
+                            // TODO
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::SimpleString("OK".to_string())).as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
