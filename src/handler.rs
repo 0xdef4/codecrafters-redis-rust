@@ -1746,7 +1746,7 @@ pub async fn handle_stream(
                                     .await;
                             }
                         }
-                        [cmd, key] if cmd.to_uppercase() == "WATCH".to_string() => {
+                        [cmd, keys @ ..] if cmd.to_uppercase() == "WATCH".to_string() => {
                             if in_multi {
                                 let _ = wr
                                     .write_all(
@@ -1757,37 +1757,32 @@ pub async fn handle_stream(
                                     )
                                     .await;
                             } else {
-                                let version: Option<u64> = {
-                                    let db = db.lock().unwrap();
-                                    if let Some(redis_value) = db.get(&key.to_string()) {
-                                        Some(redis_value.version)
-                                    } else {
-                                        None
-                                    }
-                                };
+                                for key in keys {
+                                    let version: Option<u64> = {
+                                        let db = db.lock().unwrap();
+                                        if let Some(redis_value) = db.get(&key.to_string()) {
+                                            Some(redis_value.version)
+                                        } else {
+                                            None
+                                        }
+                                    };
 
-                                match version {
-                                    Some(version) => {
-                                        watched_keys.insert(key.to_string(), version);
-
-                                        let _ = wr
-                                            .write_all(
-                                                encode(RespValue::SimpleString("OK".to_string()))
-                                                    .as_bytes(),
-                                            )
-                                            .await;
-                                    }
-                                    None => {
-                                        watched_keys.insert(key.to_string(), 0);
-
-                                        let _ = wr
-                                            .write_all(
-                                                encode(RespValue::SimpleString("OK".to_string()))
-                                                    .as_bytes(),
-                                            )
-                                            .await;
+                                    match version {
+                                        Some(version) => {
+                                            watched_keys.insert(key.to_string(), version);
+                                        }
+                                        None => {
+                                            watched_keys.insert(key.to_string(), 0);
+                                        }
                                     }
                                 }
+
+                                let _ = wr
+                                    .write_all(
+                                        encode(RespValue::SimpleString("OK".to_string()))
+                                            .as_bytes(),
+                                    )
+                                    .await;
                             }
                         }
                         _ => unreachable!(),
