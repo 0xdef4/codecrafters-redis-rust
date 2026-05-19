@@ -1010,7 +1010,8 @@ pub async fn handle_stream(
                         }
                         [cmd] if cmd.to_uppercase() == "DISCARD".to_string() => {
                             if in_multi {
-                                command_queue = Vec::new();
+                                command_queue.clear();
+                                watched_keys.clear();
 
                                 in_multi = false;
                                 let _ = wr
