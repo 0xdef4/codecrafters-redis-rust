@@ -1785,6 +1785,15 @@ pub async fn handle_stream(
                                     .await;
                             }
                         }
+                        [cmd] if cmd.to_uppercase() == "UNWATCH".to_string() => {
+                            watched_keys.clear();
+
+                            let _ = wr
+                                .write_all(
+                                    encode(RespValue::SimpleString("OK".to_string())).as_bytes(),
+                                )
+                                .await;
+                        }
                         _ => unreachable!(),
                     }
                 }
