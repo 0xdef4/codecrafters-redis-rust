@@ -21,10 +21,15 @@ pub enum ValueType {
 pub struct RedisValue {
     pub value: ValueType,
     pub expires_at: Option<Instant>,
+    pub version: u64,
 }
 
 impl RedisValue {
     pub fn new(value: ValueType, expires_at: Option<Instant>) -> Self {
-        Self { value, expires_at }
+        Self {
+            value,
+            expires_at,
+            version: 0,
+        }
     }
 }

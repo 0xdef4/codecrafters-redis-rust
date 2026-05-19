@@ -3,7 +3,7 @@ use tokio::net::TcpStream;
 use tokio::sync::{Notify, mpsc};
 use tokio::time::timeout;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -48,7 +48,7 @@ pub async fn handle_stream(
             false
         }
     };
-    let mut watched_keys: Vec<String> = Vec::new();
+    let mut watched_keys: HashMap<String, u64> = HashMap::new();
 
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
@@ -962,18 +962,41 @@ pub async fn handle_stream(
                             let mut responses = Vec::new();
 
                             if in_multi {
-                                for command in &command_queue {
-                                    let response: RespValue = execute_single_command(command, &db);
+                                let is_dirty: bool = {
+                                    let db = db.lock().unwrap();
+                                    watched_keys.iter().any(|(key, &watched_version)| {
+                                        db.get(key).map(|v| v.version).unwrap_or(0)
+                                            != watched_version
+                                    })
+                                };
 
-                                    responses.push(response);
+                                if is_dirty {
+                                    let _ =
+                                        wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
+
+                                    in_multi = false;
+                                    command_queue.clear();
+                                    watched_keys.clear();
+
+                                    continue;
+                                } else {
+                                    for command in &command_queue {
+                                        let response: RespValue =
+                                            execute_single_command(command, &db);
+
+                                        responses.push(response);
+                                    }
+
+                                    let _ = wr
+                                        .write_all(encode(RespValue::Array(responses)).as_bytes())
+                                        .await;
+
+                                    in_multi = false;
+                                    command_queue.clear();
+                                    watched_keys.clear();
+
+                                    continue;
                                 }
-
-                                let _ = wr
-                                    .write_all(encode(RespValue::Array(responses)).as_bytes())
-                                    .await;
-
-                                in_multi = false;
-                                continue;
                             } else {
                                 let _ = wr
                                     .write_all(
@@ -1724,9 +1747,7 @@ pub async fn handle_stream(
                             }
                         }
                         [cmd, key] if cmd.to_uppercase() == "WATCH".to_string() => {
-                            // TODO
                             if in_multi {
-                                // Return a RESP error like: -ERR WATCH inside MULTI is not allowed\r\n.
                                 let _ = wr
                                     .write_all(
                                         encode(RespValue::SimpleError(
@@ -1736,16 +1757,37 @@ pub async fn handle_stream(
                                     )
                                     .await;
                             } else {
-                                // Add the key to the connection's collection of watched keys
-                                watched_keys.push(key.to_string());
+                                let version: Option<u64> = {
+                                    let db = db.lock().unwrap();
+                                    if let Some(redis_value) = db.get(&key.to_string()) {
+                                        Some(redis_value.version)
+                                    } else {
+                                        None
+                                    }
+                                };
 
-                                // Return OK as a simple string
-                                let _ = wr
-                                    .write_all(
-                                        encode(RespValue::SimpleString("OK".to_string()))
-                                            .as_bytes(),
-                                    )
-                                    .await;
+                                match version {
+                                    Some(version) => {
+                                        watched_keys.insert(key.to_string(), version);
+
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::SimpleString("OK".to_string()))
+                                                    .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    None => {
+                                        watched_keys.insert(key.to_string(), 0);
+
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::SimpleString("OK".to_string()))
+                                                    .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                }
                             }
                         }
                         _ => unreachable!(),
@@ -1762,37 +1804,42 @@ pub fn execute_single_command(cmd: &[String], db: &Db) -> RespValue {
         [cmd, key, value, optional_args @ ..] if cmd.to_uppercase() == "SET" => match optional_args
         {
             [] => {
-                let redis_value = RedisValue::new(ValueType::String(value.to_string()), None);
-                {
-                    let mut db = db.lock().unwrap();
-                    db.insert(key.to_string(), redis_value);
-                }
+                let mut db = db.lock().unwrap();
+                let prev_version = db.get(key).map(|v| v.version).unwrap_or(0);
+                let mut redis_value = RedisValue::new(ValueType::String(value.to_string()), None);
+                redis_value.version = prev_version + 1;
+
+                db.insert(key.to_string(), redis_value);
 
                 RespValue::SimpleString("OK".to_string())
             }
             [option, seconds] if option.to_uppercase() == "EX" => {
+                let mut db = db.lock().unwrap();
+                let prev_version = db.get(key).map(|v| v.version).unwrap_or(0);
+
                 let now = Instant::now();
                 let expires_at = now + Duration::from_secs(seconds.parse().unwrap());
 
-                let redis_value =
+                let mut redis_value =
                     RedisValue::new(ValueType::String(value.to_string()), Some(expires_at));
-                {
-                    let mut db = db.lock().unwrap();
-                    db.insert(key.to_string(), redis_value);
-                }
+                redis_value.version = prev_version + 1;
+
+                db.insert(key.to_string(), redis_value);
 
                 RespValue::SimpleString("OK".to_string())
             }
             [option, milliseconds] if option.to_uppercase() == "PX" => {
+                let mut db = db.lock().unwrap();
+                let prev_version = db.get(key).map(|v| v.version).unwrap_or(0);
+
                 let now = Instant::now();
                 let expires_at = now + Duration::from_millis(milliseconds.parse().unwrap());
 
-                let redis_value =
+                let mut redis_value =
                     RedisValue::new(ValueType::String(value.to_string()), Some(expires_at));
-                {
-                    let mut db = db.lock().unwrap();
-                    db.insert(key.to_string(), redis_value);
-                }
+                redis_value.version = prev_version + 1;
+
+                db.insert(key.to_string(), redis_value);
 
                 RespValue::SimpleString("OK".to_string())
             }
