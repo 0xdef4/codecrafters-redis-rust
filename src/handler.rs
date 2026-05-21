@@ -1179,84 +1179,102 @@ pub async fn handle_stream(
                                 [] => {
                                     unimplemented!()
                                 }
-                                [val] if val == "dir" => {
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString("dir".to_string()),
-                                                RespValue::BulkString(
-                                                    config.dir.to_string_lossy().to_string(),
-                                                ),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
+                                [val] => match val.as_str() {
+                                    "dir" => {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::Array(vec![
+                                                    RespValue::BulkString("dir".to_string()),
+                                                    RespValue::BulkString(
+                                                        config.dir.to_string_lossy().to_string(),
+                                                    ),
+                                                ]))
+                                                .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    "dbfilename" => {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::Array(vec![
+                                                    RespValue::BulkString("dbfilename".to_string()),
+                                                    RespValue::BulkString(
+                                                        config
+                                                            .dbfilename
+                                                            .as_deref()
+                                                            .unwrap_or_default()
+                                                            .to_string(),
+                                                    ),
+                                                ]))
+                                                .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    "appendonly" => {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::Array(vec![
+                                                    RespValue::BulkString("appendonly".to_string()),
+                                                    RespValue::BulkString(
+                                                        config.appendonly.clone(),
+                                                    ),
+                                                ]))
+                                                .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    "appenddirname" => {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::Array(vec![
+                                                    RespValue::BulkString(
+                                                        "appenddirname".to_string(),
+                                                    ),
+                                                    RespValue::BulkString(
+                                                        config.appenddirname.clone(),
+                                                    ),
+                                                ]))
+                                                .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    "appendfilename" => {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::Array(vec![
+                                                    RespValue::BulkString(
+                                                        "appendfilename".to_string(),
+                                                    ),
+                                                    RespValue::BulkString(
+                                                        config.appendfilename.clone(),
+                                                    ),
+                                                ]))
+                                                .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    "appendfsync" => {
+                                        let _ = wr
+                                            .write_all(
+                                                encode(RespValue::Array(vec![
+                                                    RespValue::BulkString(
+                                                        "appendfsync".to_string(),
+                                                    ),
+                                                    RespValue::BulkString(
+                                                        config.appendfsync.clone(),
+                                                    ),
+                                                ]))
+                                                .as_bytes(),
+                                            )
+                                            .await;
+                                    }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                },
+                                _ => {
+                                    unimplemented!()
                                 }
-                                [val] if val == "dbfilename" => {
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString("dbfilename".to_string()),
-                                                RespValue::BulkString(
-                                                    config
-                                                        .dbfilename
-                                                        .as_deref()
-                                                        .unwrap_or_default()
-                                                        .to_string(),
-                                                ),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
-                                }
-                                [val] if val == "appendonly" => {
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString("appendonly".to_string()),
-                                                RespValue::BulkString(config.appendonly.clone()),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
-                                }
-                                [val] if val == "appenddirname" => {
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString("appenddirname".to_string()),
-                                                RespValue::BulkString(config.appenddirname.clone()),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
-                                }
-                                [val] if val == "appendfilename" => {
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString("appendfilename".to_string()),
-                                                RespValue::BulkString(
-                                                    config.appendfilename.clone(),
-                                                ),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
-                                }
-                                [val] if val == "appendfsync" => {
-                                    let _ = wr
-                                        .write_all(
-                                            encode(RespValue::Array(vec![
-                                                RespValue::BulkString("appendfsync".to_string()),
-                                                RespValue::BulkString(config.appendfsync.clone()),
-                                            ]))
-                                            .as_bytes(),
-                                        )
-                                        .await;
-                                }
-
-                                _ => {}
                             }
                         }
                         [cmd, pattern] if cmd.to_uppercase() == "KEYS" => {
