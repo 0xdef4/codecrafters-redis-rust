@@ -47,6 +47,23 @@ impl Config {
                     config.dbfilename = Some(args[i + 1].clone());
                     i += 2;
                 }
+                "--appendonly" => {
+                    config.appendonly = args[i + 1].clone().into();
+                    i += 2;
+                }
+                "--appenddirname" => {
+                    config.appenddirname = args[i + 1].clone().into();
+                    i += 2;
+                }
+                "--appendfilename" => {
+                    config.appendfilename = args[i + 1].clone().into();
+                    i += 2;
+                }
+                "--appendfsync" => {
+                    config.appendfsync = args[i + 1].clone().into();
+                    i += 2;
+                }
+
                 _ => i += 1,
             }
         }
