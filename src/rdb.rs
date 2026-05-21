@@ -194,11 +194,11 @@ fn read_string(buffer: &[u8], i: usize) -> (String, usize) {
 }
 
 pub fn load_if_exists(db: &Db, config: &Config) {
-    let (Some(dir), Some(filename)) = (&config.dir, &config.dbfilename) else {
+    let (dir, Some(filename)) = (&config.dir, &config.dbfilename) else {
         return;
     };
 
-    let path = format!("{}/{}", dir, filename);
+    let path = format!("{}/{}", dir.to_string_lossy().to_string(), filename);
 
     if let Ok(mut f) = File::open(&path) {
         parse_rdb(&mut f, Arc::clone(db));

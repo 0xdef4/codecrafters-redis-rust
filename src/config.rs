@@ -1,9 +1,16 @@
+use std::env;
+use std::path::PathBuf;
+
 #[derive(Clone)]
 pub struct Config {
     pub port: u16,
     pub replicaof: Option<String>,
-    pub dir: Option<String>,
+    pub dir: PathBuf,
     pub dbfilename: Option<String>,
+    pub appendonly: String,
+    pub appenddirname: String,
+    pub appendfilename: String,
+    pub appendfsync: String,
 }
 
 impl Config {
@@ -13,8 +20,12 @@ impl Config {
         let mut config = Config {
             port: 6379u16,
             replicaof: None,
-            dir: None,
+            dir: env::current_dir().unwrap(),
             dbfilename: None,
+            appendonly: "no".to_string(),
+            appenddirname: "appendonlydir".to_string(),
+            appendfilename: "appendonly.aof".to_string(),
+            appendfsync: "everysec".to_string(),
         };
 
         let mut i = 1;
@@ -29,7 +40,7 @@ impl Config {
                     i += 2;
                 }
                 "--dir" => {
-                    config.dir = Some(args[i + 1].clone());
+                    config.dir = args[i + 1].clone().into();
                     i += 2;
                 }
                 "--dbfilename" => {
