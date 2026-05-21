@@ -2,6 +2,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
+use std::fs;
 use std::sync::{Arc, Mutex};
 
 mod acl;
@@ -38,6 +39,14 @@ async fn main() {
 
     rdb::load_if_exists(&db, &config);
     replication::start_if_replica(&db, Arc::clone(&config));
+
+    // if appendonly is set to yes
+    if config.appendonly == "yes".to_string() {
+        // Create append-only directory
+        let (dir, appenddirname) = (&config.dir, &config.appenddirname);
+        let path = format!("{}/{}", dir.to_string_lossy().to_string(), appenddirname);
+        let _ = fs::create_dir_all(path);
+    }
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await

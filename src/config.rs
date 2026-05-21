@@ -5,11 +5,16 @@ use std::path::PathBuf;
 pub struct Config {
     pub port: u16,
     pub replicaof: Option<String>,
+    // The base directory where Redis stores its data files
     pub dir: PathBuf,
     pub dbfilename: Option<String>,
+    // Controls whether AOF persistence is enabled or disabled
     pub appendonly: String,
+    // The subdirectory under dir where AOF and manifest files are stored
     pub appenddirname: String,
+    // The name of the append-only file that records write operations
     pub appendfilename: String,
+    // How often buffered writes are flushed to the AOF file on disk
     pub appendfsync: String,
 }
 
