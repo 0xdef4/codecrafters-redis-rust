@@ -51,11 +51,11 @@ async fn main() {
         let _ = fs::create_dir_all(&path);
 
         // Creating the Append-Only File
-        // Creating the manifest File
         let aof_filename = format!("{}.1.incr.aof", appendfilename);
-        let manifest_filename = format!("{}.manifest", appendfilename);
-
         let _ = fs::File::create(&path.join(&aof_filename));
+
+        // Creating the manifest File
+        let manifest_filename = format!("{}.manifest", appendfilename);
         let mut f = fs::File::create(&path.join(manifest_filename)).unwrap();
 
         let _ = f.write_all(format!("file {} seq 1 type i", &aof_filename).as_bytes());
