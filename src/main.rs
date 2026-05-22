@@ -3,6 +3,7 @@ use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 mod acl;
@@ -50,11 +51,14 @@ async fn main() {
         let _ = fs::create_dir_all(&path);
 
         // Creating the Append-Only File
-        // let suffix = format!(".{}.incr", "1");
-        let filename = format!("{}.1.incr.aof", appendfilename);
-        println!("filename : {}", filename);
+        // Creating the manifest File
+        let aof_filename = format!("{}.1.incr.aof", appendfilename);
+        let manifest_filename = format!("{}.manifest", appendfilename);
 
-        let _ = fs::File::create(&path.join(filename));
+        let _ = fs::File::create(&path.join(&aof_filename));
+        let mut f = fs::File::create(&path.join(manifest_filename)).unwrap();
+
+        let _ = f.write_all(format!("file {} seq 1 type i", &aof_filename).as_bytes());
     }
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
