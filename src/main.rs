@@ -42,7 +42,7 @@ async fn main() {
     replication::start_if_replica(&db, Arc::clone(&config));
 
     // if appendonly is set to yes
-    if config.appendonly == "yes".to_string() {
+    if config.appendonly == "yes" {
         // Create append-only directory
         let (dir, appenddirname, appendfilename) =
             (&config.dir, &config.appenddirname, &config.appendfilename);

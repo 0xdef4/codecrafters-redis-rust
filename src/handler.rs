@@ -110,48 +110,50 @@ pub async fn handle_stream(
                         {
                             let resp = execute_single_command(&resp_array, &db);
 
-                            // TODO : append  command to the append-only file in RESP format.
-                            let command_to_append_in_resp_format: String =
-                                encode(RespValue::Array(
-                                    resp_array
-                                        .iter()
-                                        .map(|e| RespValue::BulkString(e.to_string()))
-                                        .collect::<Vec<_>>(),
-                                ));
+                            if config.appendonly == "yes" {
+                                // TODO : append  command to the append-only file in RESP format.
+                                let command_to_append_in_resp_format: String =
+                                    encode(RespValue::Array(
+                                        resp_array
+                                            .iter()
+                                            .map(|e| RespValue::BulkString(e.to_string()))
+                                            .collect::<Vec<_>>(),
+                                    ));
 
-                            // server should read the manifest file
-                            let (dir, appenddirname, appendfilename) =
-                                (&config.dir, &config.appenddirname, &config.appendfilename);
-                            let path = dir.join(appenddirname);
-                            let manifest_filename = format!("{}.manifest", appendfilename);
+                                // server should read the manifest file
+                                let (dir, appenddirname, appendfilename) =
+                                    (&config.dir, &config.appenddirname, &config.appendfilename);
+                                let path = dir.join(appenddirname);
+                                let manifest_filename = format!("{}.manifest", appendfilename);
 
-                            let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
-                            let mut buf = [0u8; 512];
+                                let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
+                                let mut buf = [0u8; 512];
 
-                            match f.read(&mut buf) {
-                                Ok(n) => {
-                                    let received = String::from_utf8_lossy(&buf[..n]);
+                                match f.read(&mut buf) {
+                                    Ok(n) => {
+                                        let received = String::from_utf8_lossy(&buf[..n]);
 
-                                    // find the name of the AOF file to write to.
-                                    let aof_filename =
-                                        received.split_ascii_whitespace().nth(1).unwrap();
+                                        // find the name of the AOF file to write to.
+                                        let aof_filename =
+                                            received.split_ascii_whitespace().nth(1).unwrap();
 
-                                    // write to AOF file
-                                    let mut f = fs::OpenOptions::new()
-                                        .append(true)
-                                        .open(&path.join(aof_filename))
-                                        .unwrap();
+                                        // write to AOF file
+                                        let mut f = fs::OpenOptions::new()
+                                            .append(true)
+                                            .open(&path.join(aof_filename))
+                                            .unwrap();
 
-                                    let _ =
-                                        f.write_all(command_to_append_in_resp_format.as_bytes());
+                                        let _ = f
+                                            .write_all(command_to_append_in_resp_format.as_bytes());
 
-                                    if config.appendfsync == "always" {
-                                        let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
-                                        let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
+                                        if config.appendfsync == "always" {
+                                            let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
+                                            let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
+                                        }
                                     }
-                                }
-                                _ => {
-                                    unimplemented!()
+                                    _ => {
+                                        unimplemented!()
+                                    }
                                 }
                             }
 
