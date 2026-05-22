@@ -50,8 +50,8 @@ async fn main() {
         let _ = fs::create_dir_all(&path);
 
         // Creating the Append-Only File
-        let suffix = format!(".{}.incr", "1");
-        let filename = appendfilename.replace(".", suffix.as_str());
+        // let suffix = format!(".{}.incr", "1");
+        let filename = format!("{}.1.incr.aof", appendfilename);
 
         let _ = fs::File::create(&path.join(filename));
     }
