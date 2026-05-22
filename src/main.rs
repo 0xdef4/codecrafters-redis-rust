@@ -43,9 +43,17 @@ async fn main() {
     // if appendonly is set to yes
     if config.appendonly == "yes".to_string() {
         // Create append-only directory
-        let (dir, appenddirname) = (&config.dir, &config.appenddirname);
-        let path = format!("{}/{}", dir.to_string_lossy().to_string(), appenddirname);
-        let _ = fs::create_dir_all(path);
+        let (dir, appenddirname, appendfilename) =
+            (&config.dir, &config.appenddirname, &config.appendfilename);
+
+        let path = dir.join(appenddirname);
+        let _ = fs::create_dir_all(&path);
+
+        // Creating the Append-Only File
+        let suffix = format!(".{}.incr", "1");
+        let filename = appendfilename.replace(".", suffix.as_str());
+
+        let _ = fs::File::create(&path.join(filename));
     }
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
