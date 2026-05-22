@@ -52,6 +52,7 @@ async fn main() {
         // Creating the Append-Only File
         // let suffix = format!(".{}.incr", "1");
         let filename = format!("{}.1.incr.aof", appendfilename);
+        println!("filename : {}", filename);
 
         let _ = fs::File::create(&path.join(filename));
     }
