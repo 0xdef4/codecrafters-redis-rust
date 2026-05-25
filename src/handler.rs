@@ -111,7 +111,6 @@ pub async fn handle_stream(
                             let resp = execute_single_command(&resp_array, &db);
 
                             if config.appendonly == "yes" {
-                                // TODO : append  command to the append-only file in RESP format.
                                 let command_to_append_in_resp_format: String =
                                     encode(RespValue::Array(
                                         resp_array
