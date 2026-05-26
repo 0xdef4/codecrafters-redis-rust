@@ -2,8 +2,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use crate::Config;
-use crate::protocol::resp::{RespValue, encode};
+use crate::protocol::resp::{RespValue, decode_arrays, encode};
+use crate::{Config, Db, execute_single_command};
 
 pub fn init_aof_if_enabled(config: &Config) {
     // if appendonly is set to yes
@@ -66,5 +66,45 @@ pub fn append_to_aof(resp_array: &[String], config: &Arc<Config>) {
         _ => {
             unimplemented!()
         }
+    }
+}
+
+pub fn replay_commands(config: &Config, db: &Db) {
+    let (dir, appenddirname, appendfilename) =
+        (&config.dir, &config.appenddirname, &config.appendfilename);
+
+    let path = dir.join(appenddirname);
+
+    // When the server starts with --appendonly yes and the append-only directory already exists,
+    if config.appendonly != "yes" || !fs::exists(&path).unwrap_or(false) {
+        return;
+    }
+
+    let manifest_filename = format!("{}.manifest", appendfilename);
+    let manifest_path = path.join(&manifest_filename);
+
+    let Ok(manifest_content) = fs::read_to_string(&manifest_path) else {
+        return; // if no manifest just return (first attempt case)
+    };
+
+    // get filename from "file <filename> seq 1 type i"
+    let Some(aof_filename) = manifest_content.split_ascii_whitespace().nth(1) else {
+        return;
+    };
+
+    let Ok(aof_content) = fs::read_to_string(&path.join(aof_filename)) else {
+        return;
+    };
+
+    // and parse the RESP-encoded commands inside it
+    let commands = decode_arrays(&aof_content);
+
+    // Execute each command as if a client had sent it
+    for resp_array in commands {
+        if resp_array.is_empty() {
+            continue;
+        }
+
+        execute_single_command(&resp_array, &db);
     }
 }
