@@ -4,9 +4,9 @@ use tokio::net::TcpStream;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::Config;
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
 use crate::types::db::{Db, RedisValue, ValueType};
+use crate::{Config, Replicas};
 
 pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
     if let Some((master_ip, master_port)) = config.replicaof.as_ref().unwrap().split_once(' ') {
@@ -225,4 +225,26 @@ pub fn start_if_replica(db: &Db, config: Arc<Config>) {
     tokio::spawn(async move {
         start_replica_handshake(config, db).await;
     });
+}
+
+pub async fn propagate_to_replicas(
+    resp_array: &[String],
+    replicas: &Replicas,
+    master_repl_offset: &mut usize,
+) {
+    let command_to_propagate = RespValue::Array(
+        resp_array
+            .iter()
+            .map(|e| RespValue::BulkString(e.clone()))
+            .collect::<Vec<_>>(),
+    );
+
+    *master_repl_offset += encode(command_to_propagate.clone()).as_bytes().len();
+
+    let mut replicas = replicas.lock().await;
+    for (replica_writer, _replica_reader) in replicas.iter_mut() {
+        let _ = replica_writer
+            .write_all(encode(command_to_propagate.clone()).as_bytes())
+            .await;
+    }
 }

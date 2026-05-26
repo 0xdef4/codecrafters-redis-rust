@@ -2,11 +2,10 @@ use tokio::net::TcpListener;
 use tokio::sync::{Mutex as TokioMutex, Notify};
 
 use std::collections::HashMap;
-use std::fs;
-use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 mod acl;
+mod aof;
 mod config;
 mod geospatial;
 mod handler;
@@ -40,26 +39,7 @@ async fn main() {
 
     rdb::load_if_exists(&db, &config);
     replication::start_if_replica(&db, Arc::clone(&config));
-
-    // if appendonly is set to yes
-    if config.appendonly == "yes" {
-        // Create append-only directory
-        let (dir, appenddirname, appendfilename) =
-            (&config.dir, &config.appenddirname, &config.appendfilename);
-
-        let path = dir.join(appenddirname);
-        let _ = fs::create_dir_all(&path);
-
-        // Create the Append-Only File
-        let aof_filename = format!("{}.1.incr.aof", appendfilename);
-        let _ = fs::File::create(&path.join(&aof_filename));
-
-        // Create the manifest File
-        let manifest_filename = format!("{}.manifest", appendfilename);
-        let mut f = fs::File::create(&path.join(manifest_filename)).unwrap();
-        // and write
-        let _ = f.write_all(format!("file {} seq 1 type i", &aof_filename).as_bytes());
-    }
+    aof::init_aof_if_enabled(&config);
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await
