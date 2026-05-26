@@ -96,6 +96,53 @@ pub async fn handle_stream(
                         continue;
                     }
 
+                    if config.appendonly == "yes"
+                        && is_write_command(&resp_array)
+                        && !matches!(cmd_upper.as_str(), "XADD" | "GEOADD")
+                    {
+                        let command_to_append_in_resp_format: String = encode(RespValue::Array(
+                            resp_array
+                                .iter()
+                                .map(|e| RespValue::BulkString(e.to_string()))
+                                .collect::<Vec<_>>(),
+                        ));
+
+                        // server should read the manifest file
+                        let (dir, appenddirname, appendfilename) =
+                            (&config.dir, &config.appenddirname, &config.appendfilename);
+                        let path = dir.join(appenddirname);
+                        let manifest_filename = format!("{}.manifest", appendfilename);
+
+                        let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
+                        let mut buf = [0u8; 512];
+
+                        match f.read(&mut buf) {
+                            Ok(n) => {
+                                let received = String::from_utf8_lossy(&buf[..n]);
+
+                                // find the name of the AOF file to write to.
+                                let aof_filename =
+                                    received.split_ascii_whitespace().nth(1).unwrap();
+
+                                // write to AOF file
+                                let mut f = fs::OpenOptions::new()
+                                    .append(true)
+                                    .open(&path.join(aof_filename))
+                                    .unwrap();
+
+                                let _ = f.write_all(command_to_append_in_resp_format.as_bytes());
+
+                                if config.appendfsync == "always" {
+                                    let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
+                                    let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
+                                }
+                            }
+                            _ => {
+                                unimplemented!()
+                            }
+                        }
+                    }
+
                     match resp_array.as_slice() {
                         [cmd] if cmd.to_uppercase() == "PING".to_string() => {
                             let _ = wr.write_all(b"+PONG\r\n").await;
@@ -110,72 +157,7 @@ pub async fn handle_stream(
                         {
                             let resp = execute_single_command(&resp_array, &db);
 
-                            if config.appendonly == "yes" {
-                                let command_to_append_in_resp_format: String =
-                                    encode(RespValue::Array(
-                                        resp_array
-                                            .iter()
-                                            .map(|e| RespValue::BulkString(e.to_string()))
-                                            .collect::<Vec<_>>(),
-                                    ));
-
-                                // server should read the manifest file
-                                let (dir, appenddirname, appendfilename) =
-                                    (&config.dir, &config.appenddirname, &config.appendfilename);
-                                let path = dir.join(appenddirname);
-                                let manifest_filename = format!("{}.manifest", appendfilename);
-
-                                let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
-                                let mut buf = [0u8; 512];
-
-                                match f.read(&mut buf) {
-                                    Ok(n) => {
-                                        let received = String::from_utf8_lossy(&buf[..n]);
-
-                                        // find the name of the AOF file to write to.
-                                        let aof_filename =
-                                            received.split_ascii_whitespace().nth(1).unwrap();
-
-                                        // write to AOF file
-                                        let mut f = fs::OpenOptions::new()
-                                            .append(true)
-                                            .open(&path.join(aof_filename))
-                                            .unwrap();
-
-                                        let _ = f
-                                            .write_all(command_to_append_in_resp_format.as_bytes());
-
-                                        if config.appendfsync == "always" {
-                                            let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
-                                            let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
-                                        }
-                                    }
-                                    _ => {
-                                        unimplemented!()
-                                    }
-                                }
-                            }
-
                             let _ = wr.write_all(encode(resp).as_bytes()).await;
-
-                            if role == "master" {
-                                let command_to_propagate = RespValue::Array(
-                                    resp_array
-                                        .iter()
-                                        .map(|e| RespValue::BulkString(e.clone()))
-                                        .collect::<Vec<_>>(),
-                                );
-
-                                master_repl_offset +=
-                                    encode(command_to_propagate.clone()).as_bytes().len();
-
-                                let mut replicas = replicas.lock().await;
-                                for (replica_writer, _replica_reader) in replicas.iter_mut() {
-                                    let _ = replica_writer
-                                        .write_all(encode(command_to_propagate.clone()).as_bytes())
-                                        .await;
-                                }
-                            }
                         }
                         [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
                             let resp = execute_single_command(&resp_array, &db);
@@ -703,6 +685,52 @@ pub async fn handle_stream(
                                     )
                                     .await;
                                 continue;
+                            }
+
+                            if config.appendonly == "yes" && is_write_command(&resp_array) {
+                                let command_to_append_in_resp_format: String =
+                                    encode(RespValue::Array(
+                                        resp_array
+                                            .iter()
+                                            .map(|e| RespValue::BulkString(e.to_string()))
+                                            .collect::<Vec<_>>(),
+                                    ));
+
+                                // server should read the manifest file
+                                let (dir, appenddirname, appendfilename) =
+                                    (&config.dir, &config.appenddirname, &config.appendfilename);
+                                let path = dir.join(appenddirname);
+                                let manifest_filename = format!("{}.manifest", appendfilename);
+
+                                let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
+                                let mut buf = [0u8; 512];
+
+                                match f.read(&mut buf) {
+                                    Ok(n) => {
+                                        let received = String::from_utf8_lossy(&buf[..n]);
+
+                                        // find the name of the AOF file to write to.
+                                        let aof_filename =
+                                            received.split_ascii_whitespace().nth(1).unwrap();
+
+                                        // write to AOF file
+                                        let mut f = fs::OpenOptions::new()
+                                            .append(true)
+                                            .open(&path.join(aof_filename))
+                                            .unwrap();
+
+                                        let _ = f
+                                            .write_all(command_to_append_in_resp_format.as_bytes());
+
+                                        if config.appendfsync == "always" {
+                                            let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
+                                            let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
+                                        }
+                                    }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                }
                             }
 
                             // respond
@@ -1612,6 +1640,52 @@ pub async fn handle_stream(
                                 }
                             };
 
+                            if config.appendonly == "yes" && is_write_command(&resp_array) {
+                                let command_to_append_in_resp_format: String =
+                                    encode(RespValue::Array(
+                                        resp_array
+                                            .iter()
+                                            .map(|e| RespValue::BulkString(e.to_string()))
+                                            .collect::<Vec<_>>(),
+                                    ));
+
+                                // server should read the manifest file
+                                let (dir, appenddirname, appendfilename) =
+                                    (&config.dir, &config.appenddirname, &config.appendfilename);
+                                let path = dir.join(appenddirname);
+                                let manifest_filename = format!("{}.manifest", appendfilename);
+
+                                let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
+                                let mut buf = [0u8; 512];
+
+                                match f.read(&mut buf) {
+                                    Ok(n) => {
+                                        let received = String::from_utf8_lossy(&buf[..n]);
+
+                                        // find the name of the AOF file to write to.
+                                        let aof_filename =
+                                            received.split_ascii_whitespace().nth(1).unwrap();
+
+                                        // write to AOF file
+                                        let mut f = fs::OpenOptions::new()
+                                            .append(true)
+                                            .open(&path.join(aof_filename))
+                                            .unwrap();
+
+                                        let _ = f
+                                            .write_all(command_to_append_in_resp_format.as_bytes());
+
+                                        if config.appendfsync == "always" {
+                                            let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
+                                            let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
+                                        }
+                                    }
+                                    _ => {
+                                        unimplemented!()
+                                    }
+                                }
+                            }
+
                             let _ = wr
                                 .write_all(
                                     encode(RespValue::Integers(num_new_members_added as i64))
@@ -1907,6 +1981,24 @@ pub async fn handle_stream(
                         }
                         _ => unreachable!(),
                     }
+
+                    if role == "master" && is_write_command(&resp_array) {
+                        let command_to_propagate = RespValue::Array(
+                            resp_array
+                                .iter()
+                                .map(|e| RespValue::BulkString(e.clone()))
+                                .collect::<Vec<_>>(),
+                        );
+
+                        master_repl_offset += encode(command_to_propagate.clone()).as_bytes().len();
+
+                        let mut replicas = replicas.lock().await;
+                        for (replica_writer, _replica_reader) in replicas.iter_mut() {
+                            let _ = replica_writer
+                                .write_all(encode(command_to_propagate.clone()).as_bytes())
+                                .await;
+                        }
+                    }
                 }
             }
             Err(_) => break,
@@ -2014,5 +2106,13 @@ pub fn execute_single_command(cmd: &[String], db: &Db) -> RespValue {
             }
         }
         _ => RespValue::SimpleError("ERR unknown command".to_string()),
+    }
+}
+
+pub fn is_write_command(cmd: &[String]) -> bool {
+    match cmd.first().map(|s| s.to_uppercase()).as_deref() {
+        Some("SET") | Some("DEL") | Some("INCR") | Some("RPUSH") | Some("LPUSH") | Some("LPOP")
+        | Some("ZADD") | Some("ZREM") | Some("XADD") | Some("GEOADD") => true,
+        _ => false,
     }
 }
