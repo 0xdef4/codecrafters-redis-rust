@@ -39,8 +39,8 @@ async fn main() {
 
     rdb::load_if_exists(&db, &config);
     replication::start_if_replica(&db, Arc::clone(&config));
-    aof::init_aof_if_enabled(&config);
 
+    aof::init_aof_if_enabled(&config);
     aof::replay_commands(&config, &db);
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
