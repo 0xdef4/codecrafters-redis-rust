@@ -18,10 +18,7 @@ mod types;
 use config::*;
 use handler::*;
 
-use crate::types::acl::{AclDb, AclUser};
-use crate::types::db::Db;
-use crate::types::pubsub::Pubsub;
-use crate::types::replication::Replicas;
+use crate::types::{AclDb, AclUser, Db, Pubsub, Replicas};
 
 #[tokio::main]
 async fn main() {

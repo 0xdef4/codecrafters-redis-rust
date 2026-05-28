@@ -19,10 +19,7 @@ use crate::geospatial::{
 };
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
-use crate::types::{
-    acl::AclDb, db::Db, db::RedisValue, db::ValueType, pubsub::Pubsub, replication::Replicas,
-    stream::StreamEntry, zset::Zset,
-};
+use crate::types::{AclDb, Db, Pubsub, RedisValue, Replicas, StreamEntry, ValueType, Zset};
 use crate::{Config, acl::sha256_hash, pubsub::handle_subscribe_loop};
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);

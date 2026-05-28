@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use crate::types::stream::StreamEntry;
-use crate::types::zset::Zset;
+use crate::types::{StreamEntry, Zset};
 
 pub type Db = Arc<Mutex<HashMap<String, RedisValue>>>;
 

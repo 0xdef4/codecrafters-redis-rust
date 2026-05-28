@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
-use crate::types::db::{Db, RedisValue, ValueType};
+use crate::types::{Db, RedisValue, ValueType};
 use crate::{Config, Replicas};
 
 pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {

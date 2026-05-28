@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use std::collections::HashSet;
 
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
-use crate::types::pubsub::Pubsub;
+use crate::types::Pubsub;
 
 pub async fn handle_subscribe_loop(
     mut wr: OwnedWriteHalf,
