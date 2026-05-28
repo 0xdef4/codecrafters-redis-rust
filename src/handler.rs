@@ -1866,6 +1866,12 @@ pub async fn handle_stream(
 
 pub fn execute_single_command(command: &[String], db: &Db) -> RespValue {
     match command {
+        [cmd] if cmd.to_uppercase() == "PING".to_string() => {
+            RespValue::SimpleString("PONG".to_string())
+        }
+        [cmd, arg] if cmd.to_uppercase() == "ECHO".to_string() => {
+            RespValue::BulkString(arg.clone())
+        }
         [cmd, key, value, optional_args @ ..] if cmd.to_uppercase() == "SET" => match optional_args
         {
             [] => {
