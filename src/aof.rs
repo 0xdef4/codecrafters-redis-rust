@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use crate::protocol::resp::{RespValue, decode_arrays, encode};
+use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::{Config, Db, execute_single_command};
 
 pub fn init_aof_if_enabled(config: &Config) {

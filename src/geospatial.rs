@@ -1,8 +1,8 @@
-pub mod check_valid;
-pub mod coordinates;
-pub mod decode;
-pub mod distance;
-pub mod encode;
+mod check_valid;
+mod coordinates;
+mod decode;
+mod distance;
+mod encode;
 
 const MIN_LATITUDE: f64 = -85.05112878;
 const MAX_LATITUDE: f64 = 85.05112878;

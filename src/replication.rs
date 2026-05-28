@@ -4,7 +4,7 @@ use tokio::net::TcpStream;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::protocol::resp::{RespValue, decode_arrays, encode};
+use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::types::{Db, RedisValue, ValueType};
 use crate::{Config, Replicas};
 

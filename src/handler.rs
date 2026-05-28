@@ -14,7 +14,7 @@ use crate::geospatial::{
     Coordinates, decode as geo_decode, encode as geo_encode, haversine,
     {is_valid_latitude, is_valid_longitude},
 };
-use crate::protocol::resp::{RespValue, decode_arrays, encode};
+use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
 use crate::types::{AclDb, Db, Pubsub, RedisValue, Replicas, StreamEntry, ValueType, Zset};
 use crate::{Config, acl::sha256_hash, pubsub::handle_subscribe_loop};

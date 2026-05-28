@@ -1,9 +1,9 @@
-pub mod acl;
-pub mod db;
-pub mod pubsub;
-pub mod replication;
-pub mod stream;
-pub mod zset;
+mod acl;
+mod db;
+mod pubsub;
+mod replication;
+mod stream;
+mod zset;
 
 pub use acl::{AclDb, AclUser};
 pub use db::{Db, RedisValue, ValueType};

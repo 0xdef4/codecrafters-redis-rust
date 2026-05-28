@@ -1,4 +1,4 @@
-use crate::protocol::resp::RespValue;
+use crate::protocol::RespValue;
 
 #[derive(Debug, Clone)]
 pub struct StreamEntry {
