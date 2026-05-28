@@ -1969,6 +1969,27 @@ pub fn execute_single_command(command: &[String], db: &Db) -> RespValue {
                 RespValue::Integers(1)
             }
         }
+        [cmd, list_key] if cmd.to_uppercase() == "TYPE".to_string() => {
+            let type_of_value = {
+                let db = db.lock().unwrap();
+
+                if let Some(redis_value) = db.get(list_key) {
+                    match &redis_value.value {
+                        ValueType::String(_) => "string".to_string(),
+                        ValueType::List(_) => "list".to_string(),
+                        ValueType::Set() => "set".to_string(),
+                        ValueType::Zset(_) => "zset".to_string(),
+                        ValueType::Hash() => "hash".to_string(),
+                        ValueType::Stream(_) => "stream".to_string(),
+                        ValueType::Vectorset() => "vectorset".to_string(),
+                    }
+                } else {
+                    "none".to_string()
+                }
+            };
+            RespValue::SimpleString(type_of_value)
+        }
+        // excluded : RPUSH, LRANGE, LPUSH, LPOP, BLPOP, etc.
         _ => RespValue::SimpleError("ERR unknown command".to_string()),
     }
 }
