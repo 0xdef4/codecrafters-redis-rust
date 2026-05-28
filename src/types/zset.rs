@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use crate::geospatial::{coordinates::Coordinates, decode::decode, distance::haversine};
+use crate::geospatial::{Coordinates, decode, haversine};
 
 pub struct Zset {
     sorted: BTreeMap<(u64, String), f64>,

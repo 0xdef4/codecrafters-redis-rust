@@ -11,11 +11,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::aof::append_to_aof;
 use crate::geospatial::{
-    check_valid::{is_valid_latitude, is_valid_longitude},
-    coordinates::Coordinates,
-    decode::decode as geo_decode,
-    distance::haversine,
-    encode::encode as geo_encode,
+    Coordinates, decode as geo_decode, encode as geo_encode, haversine,
+    {is_valid_latitude, is_valid_longitude},
 };
 use crate::protocol::resp::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;

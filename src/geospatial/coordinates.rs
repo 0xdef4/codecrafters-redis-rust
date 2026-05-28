@@ -1,4 +1,4 @@
-use crate::geospatial::distance::Point;
+use crate::geospatial::Point;
 
 #[derive(Debug)]
 pub struct Coordinates {

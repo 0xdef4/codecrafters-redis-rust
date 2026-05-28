@@ -1,4 +1,4 @@
-use crate::geospatial::coordinates::Coordinates;
+use crate::geospatial::Coordinates;
 use crate::geospatial::{LATITUDE_RANGE, LONGITUDE_RANGE, MIN_LATITUDE, MIN_LONGITUDE};
 
 fn compact_int64_to_int32(v: u64) -> u32 {
