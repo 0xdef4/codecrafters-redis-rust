@@ -14,6 +14,7 @@ mod pubsub;
 mod rdb;
 mod replication;
 mod types;
+mod utils;
 
 use config::*;
 use handler::*;

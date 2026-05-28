@@ -109,14 +109,14 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                     println!("received (in replica): {:?}", received);
 
                     let commands = decode_arrays(&received);
-                    for resp_array in commands {
-                        println!("resp_array (in replica): {:?}", resp_array);
+                    for command in commands {
+                        println!("command (in replica): {:?}", command);
 
-                        match resp_array.as_slice() {
+                        match command.as_slice() {
                             [cmd] if cmd.to_uppercase() == "PING".to_string() => {
                                 // calculate the byte size of the command
                                 let byte_size_of_command = encode(RespValue::Array(
-                                    resp_array
+                                    command
                                         .iter()
                                         .map(|e| RespValue::BulkString(e.to_string()))
                                         .collect::<Vec<_>>(),
@@ -168,7 +168,7 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
 
                                 // calculate the byte size of the command
                                 let byte_size_of_command = encode(RespValue::Array(
-                                    resp_array
+                                    command
                                         .iter()
                                         .map(|e| RespValue::BulkString(e.to_string()))
                                         .collect::<Vec<_>>(),
@@ -196,7 +196,7 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
 
                                 // calculate the byte size of the command
                                 let byte_size_of_command = encode(RespValue::Array(
-                                    resp_array
+                                    command
                                         .iter()
                                         .map(|e| RespValue::BulkString(e.to_string()))
                                         .collect::<Vec<_>>(),
@@ -228,12 +228,12 @@ pub fn start_if_replica(db: &Db, config: Arc<Config>) {
 }
 
 pub async fn propagate_to_replicas(
-    resp_array: &[String],
+    command: &[String],
     replicas: &Replicas,
     master_repl_offset: &mut usize,
 ) {
     let command_to_propagate = RespValue::Array(
-        resp_array
+        command
             .iter()
             .map(|e| RespValue::BulkString(e.clone()))
             .collect::<Vec<_>>(),

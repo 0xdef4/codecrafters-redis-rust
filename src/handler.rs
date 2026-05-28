@@ -17,6 +17,7 @@ use crate::geospatial::{
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
 use crate::types::{AclDb, Db, Pubsub, RedisValue, Replicas, StreamEntry, ValueType, Zset};
+use crate::utils::is_write_command;
 use crate::{Config, acl::sha256_hash, pubsub::handle_subscribe_loop};
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -60,9 +61,9 @@ pub async fn handle_stream(
                 println!("received: {:?}", received);
 
                 let commands = decode_arrays(&received);
-                for resp_array in commands {
-                    println!("resp_array: {:?}", resp_array);
-                    let cmd_upper = resp_array[0].to_uppercase();
+                for command in commands {
+                    println!("command: {:?}", command);
+                    let cmd_upper = command[0].to_uppercase();
 
                     if in_multi
                         && cmd_upper != "EXEC"
@@ -70,7 +71,7 @@ pub async fn handle_stream(
                         && cmd_upper != "DISCARD"
                         && cmd_upper != "WATCH"
                     {
-                        command_queue.push(resp_array.clone());
+                        command_queue.push(command.clone());
                         let _ = wr
                             .write_all(
                                 encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes(),
@@ -92,13 +93,13 @@ pub async fn handle_stream(
                     }
 
                     if config.appendonly == "yes"
-                        && is_write_command(&resp_array)
+                        && is_write_command(&command)
                         && !matches!(cmd_upper.as_str(), "XADD" | "GEOADD")
                     {
-                        append_to_aof(&resp_array, &config);
+                        append_to_aof(&command, &config);
                     }
 
-                    match resp_array.as_slice() {
+                    match command.as_slice() {
                         [cmd] if cmd.to_uppercase() == "PING".to_string() => {
                             let _ = wr.write_all(b"+PONG\r\n").await;
                         }
@@ -110,12 +111,12 @@ pub async fn handle_stream(
                         [cmd, key, value, optional_args @ ..]
                             if cmd.to_uppercase() == "SET".to_string() =>
                         {
-                            let resp = execute_single_command(&resp_array, &db);
+                            let resp = execute_single_command(&command, &db);
 
                             let _ = wr.write_all(encode(resp).as_bytes()).await;
                         }
                         [cmd, key] if cmd.to_uppercase() == "GET".to_string() => {
-                            let resp = execute_single_command(&resp_array, &db);
+                            let resp = execute_single_command(&command, &db);
                             let _ = wr.write_all(encode(resp).as_bytes()).await;
                         }
                         [cmd, list_key, list_values @ ..]
@@ -642,8 +643,8 @@ pub async fn handle_stream(
                                 continue;
                             }
 
-                            if config.appendonly == "yes" && is_write_command(&resp_array) {
-                                append_to_aof(&resp_array, &config);
+                            if config.appendonly == "yes" && is_write_command(&command) {
+                                append_to_aof(&command, &config);
                             }
 
                             // respond
@@ -936,7 +937,7 @@ pub async fn handle_stream(
                                 .await;
                         }
                         [cmd, key] if cmd.to_uppercase() == "INCR".to_string() => {
-                            let resp = execute_single_command(&resp_array, &db);
+                            let resp = execute_single_command(&command, &db);
                             let _ = wr.write_all(encode(resp).as_bytes()).await;
                         }
                         [cmd] if cmd.to_uppercase() == "MULTI".to_string() => {
@@ -1129,10 +1130,10 @@ pub async fn handle_stream(
                                             if let Ok(n) = replica_reader.read(&mut buf).await {
                                                 let received = String::from_utf8_lossy(&buf[..n]);
                                                 let commands = decode_arrays(&received);
-                                                for resp_array in commands {
+                                                for command in commands {
                                                     // REPLCONF ACK <offset>
                                                     if let [cmd, subcmd, offset] =
-                                                        resp_array.as_slice()
+                                                        command.as_slice()
                                                     {
                                                         if cmd.to_uppercase() == "REPLCONF"
                                                             && subcmd.to_uppercase() == "ACK"
@@ -1553,8 +1554,8 @@ pub async fn handle_stream(
                                 }
                             };
 
-                            if config.appendonly == "yes" && is_write_command(&resp_array) {
-                                append_to_aof(&resp_array, &config);
+                            if config.appendonly == "yes" && is_write_command(&command) {
+                                append_to_aof(&command, &config);
                             }
 
                             let _ = wr
@@ -1853,9 +1854,8 @@ pub async fn handle_stream(
                         _ => unreachable!(),
                     }
 
-                    if role == "master" && is_write_command(&resp_array) {
-                        propagate_to_replicas(&resp_array, &replicas, &mut master_repl_offset)
-                            .await;
+                    if role == "master" && is_write_command(&command) {
+                        propagate_to_replicas(&command, &replicas, &mut master_repl_offset).await;
                     }
                 }
             }
@@ -1864,8 +1864,8 @@ pub async fn handle_stream(
     }
 }
 
-pub fn execute_single_command(cmd: &[String], db: &Db) -> RespValue {
-    match cmd {
+pub fn execute_single_command(command: &[String], db: &Db) -> RespValue {
+    match command {
         [cmd, key, value, optional_args @ ..] if cmd.to_uppercase() == "SET" => match optional_args
         {
             [] => {
@@ -1964,13 +1964,5 @@ pub fn execute_single_command(cmd: &[String], db: &Db) -> RespValue {
             }
         }
         _ => RespValue::SimpleError("ERR unknown command".to_string()),
-    }
-}
-
-pub fn is_write_command(cmd: &[String]) -> bool {
-    match cmd.first().map(|s| s.to_uppercase()).as_deref() {
-        Some("SET") | Some("DEL") | Some("INCR") | Some("RPUSH") | Some("LPUSH") | Some("LPOP")
-        | Some("ZADD") | Some("ZREM") | Some("XADD") | Some("GEOADD") => true,
-        _ => false,
     }
 }

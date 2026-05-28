@@ -31,9 +31,9 @@ pub fn init_aof_if_enabled(config: &Config) {
     }
 }
 
-pub fn append_to_aof(resp_array: &[String], config: &Arc<Config>) {
+pub fn append_to_aof(command: &[String], config: &Arc<Config>) {
     let command_to_append_in_resp_format: String = encode(RespValue::Array(
-        resp_array
+        command
             .iter()
             .map(|e| RespValue::BulkString(e.to_string()))
             .collect::<Vec<_>>(),
@@ -104,11 +104,11 @@ pub fn replay_commands(config: &Config, db: &Db) {
     let commands = decode_arrays(&aof_content);
 
     // Execute each command as if a client had sent it
-    for resp_array in commands {
-        if resp_array.is_empty() {
+    for command in commands {
+        if command.is_empty() {
             continue;
         }
 
-        execute_single_command(&resp_array, &db);
+        execute_single_command(&command, &db);
     }
 }

@@ -24,8 +24,8 @@ pub async fn handle_subscribe_loop(
                    let received = String::from_utf8_lossy(&buf[..n]);
                    let commands = decode_arrays(&received);
 
-                   for resp_array in commands {
-                       match resp_array.as_slice() {
+                   for command in commands {
+                       match command.as_slice() {
                            [cmd, channel_name]
                                if cmd.to_uppercase()
                                    == "SUBSCRIBE".to_string() =>
@@ -119,7 +119,7 @@ pub async fn handle_subscribe_loop(
                                if cmd.to_uppercase() == "QUIT".to_string() => {
                            }
                            _ => {
-                               if let [cmd, _rest @ ..] = resp_array.as_slice()
+                               if let [cmd, _rest @ ..] = command.as_slice()
                                {
                                    let error_message = format!(
                                        "ERR Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context",
