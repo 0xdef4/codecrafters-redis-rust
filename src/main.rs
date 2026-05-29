@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 mod acl;
 mod aof;
+mod commands;
 mod config;
 mod geospatial;
 mod handler;
@@ -39,7 +40,7 @@ async fn main() {
     replication::start_if_replica(&db, Arc::clone(&config));
 
     aof::init_aof_if_enabled(&config);
-    aof::replay_commands(&config, &db);
+    aof::replay_commands(&config, &db, &notify);
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await

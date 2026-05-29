@@ -2,8 +2,11 @@ use std::fs;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use tokio::sync::Notify;
+
+use crate::commands::dispatch_command_inner;
 use crate::protocol::{RespValue, decode_arrays, encode};
-use crate::{Config, Db, execute_single_command};
+use crate::{Config, Db};
 
 pub fn init_aof_if_enabled(config: &Config) {
     // if appendonly is set to yes
@@ -73,7 +76,7 @@ pub fn append_to_aof(command: &[String], config: &Arc<Config>) {
     }
 }
 
-pub fn replay_commands(config: &Config, db: &Db) {
+pub fn replay_commands(config: &Arc<Config>, db: &Db, notify: &Arc<Notify>) {
     let (dir, appenddirname, appendfilename) =
         (&config.dir, &config.appenddirname, &config.appendfilename);
 
@@ -104,11 +107,19 @@ pub fn replay_commands(config: &Config, db: &Db) {
     let commands = decode_arrays(&aof_content);
 
     // Execute each command as if a client had sent it
+    // for command in commands {
+    //     if command.is_empty() {
+    //         continue;
+    //     }
+
+    //     execute_single_command(&command, &db);
+    // }
+
     for command in commands {
         if command.is_empty() {
             continue;
         }
 
-        execute_single_command(&command, &db);
+        dispatch_command_inner(&command, db, &notify, &config);
     }
 }
