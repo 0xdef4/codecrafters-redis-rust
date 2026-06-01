@@ -20,20 +20,26 @@ use tokio::sync::Notify;
 
 use crate::Config;
 use crate::protocol::RespValue;
-use crate::types::Db;
+use crate::types::{AclDb, Db, Pubsub};
 
+mod acl;
 mod geo;
 mod list;
+mod pubsub;
+mod replication;
 mod server;
 mod stream;
 mod string;
 mod transaction;
 mod zset;
 
+pub use acl::{execute_acl, execute_auth};
 pub use geo::{execute_geoadd, execute_geodist, execute_geopos, execute_geosearch};
 pub use list::{
     execute_blpop, execute_llen, execute_lpop, execute_lpush, execute_lrange, execute_rpush,
 };
+pub use pubsub::execute_publish;
+pub use replication::execute_replconf;
 pub use server::{
     execute_config, execute_echo, execute_info, execute_keys, execute_ping, execute_type,
 };
@@ -53,14 +59,13 @@ pub async fn dispatch_command(
     notify: &Arc<Notify>,
     config: &Arc<Config>,
     role: &str,
-
     in_multi: &mut bool,
     command_queue: &mut Vec<Vec<String>>,
     watched_keys: &mut HashMap<String, u64>,
     // replicas: &Replicas,
-    // pubsub: &Pubsub,
-    // acl_db: &AclDb,
-    // is_authenticated: &mut bool,
+    pubsub: &Pubsub,
+    acl_db: &AclDb,
+    is_authenticated: &mut bool,
 ) -> Option<RespValue> {
     match command[0].to_uppercase().as_str() {
         // string.rs
@@ -114,6 +119,14 @@ pub async fn dispatch_command(
         "DISCARD" => execute_discard(command, in_multi, command_queue, watched_keys),
         "WATCH" => execute_watch(command, db, in_multi, watched_keys),
         "UNWATCH" => execute_unwatch(command, watched_keys),
+
+        // pubsub.rs
+        "PUBLISH" => execute_publish(command, pubsub).await,
+        // acl.rs
+        "ACL" => execute_acl(command, acl_db),
+        "AUTH" => execute_auth(command, acl_db, is_authenticated),
+        // replication.rs
+        "REPLCONF" => execute_replconf(command),
 
         // TODO :
         // pubsub.rs          // SUBSCRIBE, PUBLISH
