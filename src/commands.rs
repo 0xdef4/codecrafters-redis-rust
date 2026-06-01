@@ -128,15 +128,6 @@ pub async fn dispatch_command(
         // replication.rs
         "REPLCONF" => execute_replconf(command),
 
-        // TODO :
-        // pubsub.rs          // SUBSCRIBE, PUBLISH
-        // acl.rs             // ACL, AUTH
-        // replication.rs     // REPLCONF, PSYNC, WAIT
-
-        // handle_stream에 남겨야 하는 특수 케이스들:
-        // SUBSCRIBE - wr/rd 소유권 넘기고 별도 루프 진입, return
-        // PSYNC - wr/rd 소유권을 replicas에 저장하고 return
-        // WAIT - replicas 뮤텍스 락 잡고 wr에 직접 씀
         _ => Some(RespValue::SimpleError("ERR unknown command".to_string())),
     }
 }
@@ -149,25 +140,50 @@ pub fn dispatch_command_inner(
     config: &Arc<Config>,
 ) -> Option<RespValue> {
     match command[0].to_uppercase().as_str() {
+        // string.rs
         "SET" => execute_set(command, db),
         "GET" => execute_get(command, db),
         "INCR" => execute_incr(command, db),
+
+        // list.rs (BLPOP excluded)
         "LPUSH" => execute_lpush(command, db, notify),
         "RPUSH" => execute_rpush(command, db, notify),
         "LPOP" => execute_lpop(command, db),
         "LRANGE" => execute_lrange(command, db),
         "LLEN" => execute_llen(command, db),
+
+        // stream.rs (XREAD excluded)
+        "XADD" => execute_xadd(command, db, notify, config),
+        "XRANGE" => execute_xrange(command, db),
+
+        // zset.rs
         "ZADD" => execute_zadd(command, db),
         "ZRANK" => execute_zrank(command, db),
         "ZRANGE" => execute_zrange(command, db),
         "ZSCORE" => execute_zscore(command, db),
         "ZREM" => execute_zrem(command, db),
         "ZCARD" => execute_zcard(command, db),
-        "XADD" => execute_xadd(command, db, notify, config),
-        "XRANGE" => execute_xrange(command, db),
-        "TYPE" => execute_type(command, db),
+
+        // geo.rs
         "GEOADD" => execute_geoadd(command, db, config),
-        // BLPOP, XREAD 등 블로킹은 제외
+        "GEOPOS" => execute_geopos(command, db),
+        "GEODIST" => execute_geodist(command, db),
+        "GEOSEARCH" => execute_geosearch(command, db),
+
+        // server.rs (INFO excluded)
+        "PING" => execute_ping(command),
+        "ECHO" => execute_echo(command),
+        "CONFIG" => execute_config(command, config),
+        "KEYS" => execute_keys(command, db),
+        "TYPE" => execute_type(command, db),
+
+        // pubsub.rs (SUBSCRIBE PUBLISH excluded)
+
+        // acl.rs (ACL AUTH excluded)
+
+        // transaction.rs (MULTI EXEC DISCARD WATCH UNWATCH excluded)
+
+        // replication.rs (REPLCONF excluded)
         _ => Some(RespValue::SimpleError("ERR unknown command".to_string())),
     }
 }
