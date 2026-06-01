@@ -1,25 +1,20 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::sync::{Notify, mpsc};
-use tokio::time::timeout;
 
 use std::collections::{HashMap, HashSet};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use crate::aof::append_to_aof;
 use crate::commands::dispatch_command;
-use crate::geospatial::{
-    Coordinates, decode as geo_decode, encode as geo_encode, haversine,
-    {is_valid_latitude, is_valid_longitude},
-};
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
-use crate::types::{AclDb, Db, Pubsub, RedisValue, Replicas, StreamEntry, ValueType, Zset};
+use crate::types::{AclDb, Db, Pubsub, Replicas};
 use crate::utils::is_write_command;
-use crate::{Config, acl::sha256_hash, pubsub::handle_subscribe_loop};
+use crate::{Config, pubsub::handle_subscribe_loop};
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
