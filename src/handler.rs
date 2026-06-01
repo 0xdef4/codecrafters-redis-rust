@@ -223,7 +223,7 @@ pub async fn handle_stream(
                             }
                         }
                         _ => {
-                            if let Some(resp) = dispatch_command(
+                            let resp = dispatch_command(
                                 &command,
                                 &db,
                                 &notify,
@@ -236,9 +236,17 @@ pub async fn handle_stream(
                                 &acl_db,
                                 &mut is_authenticated,
                             )
-                            .await
-                            {
-                                let _ = wr.write_all(encode(resp).as_bytes()).await;
+                            .await;
+
+                            match resp {
+                                Some(resp) => {
+                                    let _ = wr.write_all(encode(resp).as_bytes()).await;
+                                }
+                                None => {
+                                    let _ =
+                                        wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
+                                    return;
+                                }
                             }
                         }
                     }
