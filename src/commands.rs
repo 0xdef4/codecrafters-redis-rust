@@ -166,6 +166,7 @@ pub fn dispatch_command_inner(
         "XADD" => execute_xadd(command, db, notify, config),
         "XRANGE" => execute_xrange(command, db),
         "TYPE" => execute_type(command, db),
+        "GEOADD" => execute_geoadd(command, db, config),
         // BLPOP, XREAD 등 블로킹은 제외
         _ => Some(RespValue::SimpleError("ERR unknown command".to_string())),
     }

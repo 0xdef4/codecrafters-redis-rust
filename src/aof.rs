@@ -106,15 +106,6 @@ pub fn replay_commands(config: &Arc<Config>, db: &Db, notify: &Arc<Notify>) {
     // and parse the RESP-encoded commands inside it
     let commands = decode_arrays(&aof_content);
 
-    // Execute each command as if a client had sent it
-    // for command in commands {
-    //     if command.is_empty() {
-    //         continue;
-    //     }
-
-    //     execute_single_command(&command, &db);
-    // }
-
     for command in commands {
         if command.is_empty() {
             continue;
