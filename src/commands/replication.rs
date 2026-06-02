@@ -55,7 +55,7 @@ pub async fn execute_wait(
     master_repl_offset: usize,
 ) {
     match command {
-        [cmd, _replid, _offset] if cmd.to_uppercase() == "WAIT".to_string() => {
+        [cmd, numreplicas, timeout] if cmd.to_uppercase() == "WAIT".to_string() => {
             let mut replicas = replicas.lock().await;
 
             if master_repl_offset == 0 {
@@ -70,7 +70,7 @@ pub async fn execute_wait(
                     RespValue::BulkString("*".to_string()),
                 ]);
 
-                let timeout_ms = command[2].parse::<u64>().unwrap();
+                let timeout_ms = timeout.parse::<u64>().unwrap();
                 let ack_count = Arc::new(Mutex::new(0usize));
                 let ack_count_clone = Arc::clone(&ack_count);
 
