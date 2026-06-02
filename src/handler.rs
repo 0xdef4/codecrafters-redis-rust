@@ -1,19 +1,19 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::Notify;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::Config;
 use crate::aof::append_to_aof;
 use crate::commands::{dispatch_command, execute_psync, execute_subscribe};
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
 use crate::types::{AclDb, Db, Pubsub, Replicas};
 use crate::utils::is_write_command;
-use crate::{Config, pubsub::handle_subscribe_loop};
 
 static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -109,24 +109,6 @@ pub async fn handle_stream(
                         "PSYNC" => {
                             execute_psync(command.as_slice(), wr, rd, &replicas).await;
                             return;
-                            // let _ = wr
-                            //     .write_all(
-                            //         encode(RespValue::SimpleString(
-                            //             "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"
-                            //                 .to_string(),
-                            //         ))
-                            //         .as_bytes(),
-                            //     )
-                            //     .await;
-
-                            // let rdb = hex::decode("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2").unwrap();
-                            // let header = format!("${}\r\n", rdb.len());
-                            // let _ = wr.write_all(header.as_bytes()).await;
-                            // let _ = wr.write_all(&rdb).await;
-
-                            // let mut replicas = replicas.lock().await;
-                            // replicas.push((wr, rd.into_inner()));
-                            // return;
                         }
                         "WAIT" => {
                             let mut replicas = replicas.lock().await;
