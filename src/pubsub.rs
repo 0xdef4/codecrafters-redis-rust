@@ -8,13 +8,13 @@ use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::types::Pubsub;
 
 pub async fn handle_subscribe_loop(
-    mut wr: OwnedWriteHalf,
-    mut rd: BufReader<OwnedReadHalf>,
-    pubsub: Pubsub,
-    client_id: u64,
+    wr: &mut OwnedWriteHalf,
+    rd: &mut BufReader<OwnedReadHalf>,
+    pubsub: &Pubsub,
+    client_id: &u64,
     tx: mpsc::Sender<(String, String)>,
     mut rx: mpsc::Receiver<(String, String)>,
-    mut subscribed_channels: HashSet<String>,
+    subscribed_channels: &mut HashSet<String>,
 ) {
     let mut buf = [0u8; 512];
 
@@ -35,7 +35,7 @@ pub async fn handle_subscribe_loop(
                                    pubsub
                                        .entry(channel_name.to_string())
                                        .or_default()
-                                       .push((client_id, tx.clone()));
+                                       .push((*client_id, tx.clone()));
                                };
 
                                subscribed_channels
@@ -67,7 +67,7 @@ pub async fn handle_subscribe_loop(
                                 {
                                    let mut pubsub = pubsub.lock().unwrap();
                                    if let Some(list) = pubsub.get_mut(channel_name) {
-                                     list.retain(|(id, _)| *id != client_id);
+                                     list.retain(|(id, _)| *id != *client_id);
                                    }
                                 }
 

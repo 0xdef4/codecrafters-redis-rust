@@ -3,13 +3,12 @@ use tokio::net::TcpStream;
 use tokio::sync::{Notify, mpsc};
 
 use std::collections::{HashMap, HashSet};
-
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::aof::append_to_aof;
-use crate::commands::dispatch_command;
+use crate::commands::{dispatch_command, execute_subscribe};
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
 use crate::types::{AclDb, Db, Pubsub, Replicas};
@@ -97,40 +96,50 @@ pub async fn handle_stream(
 
                     match cmd_upper.as_str() {
                         "SUBSCRIBE" => {
-                            let (tx, rx) = mpsc::channel::<(String, String)>(100);
-                            {
-                                let mut pubsub = pubsub.lock().unwrap();
-                                pubsub
-                                    .entry(command[1].to_string())
-                                    .or_default()
-                                    .push((client_id, tx.clone()));
-                            };
-
-                            subscribed_channels.insert(command[1].to_string());
-                            let subscribed_channels_count = subscribed_channels.len();
-
-                            let _ = wr
-                                .write_all(
-                                    encode(RespValue::Array(vec![
-                                        RespValue::BulkString("subscribe".to_string()),
-                                        RespValue::BulkString(command[1].to_string()),
-                                        RespValue::Integers(subscribed_channels_count as i64),
-                                    ]))
-                                    .as_bytes(),
-                                )
-                                .await;
-
-                            handle_subscribe_loop(
-                                wr,
-                                rd,
-                                pubsub,
-                                client_id,
-                                tx,
-                                rx,
-                                subscribed_channels,
+                            execute_subscribe(
+                                command.as_slice(),
+                                &pubsub,
+                                &client_id,
+                                &mut subscribed_channels,
+                                &mut wr,
+                                &mut rd,
                             )
                             .await;
-                            return;
+
+                            // let (tx, rx) = mpsc::channel::<(String, String)>(100);
+                            // {
+                            //     let mut pubsub = pubsub.lock().unwrap();
+                            //     pubsub
+                            //         .entry(command[1].to_string())
+                            //         .or_default()
+                            //         .push((client_id, tx.clone()));
+                            // };
+
+                            // subscribed_channels.insert(command[1].to_string());
+                            // let subscribed_channels_count = subscribed_channels.len();
+
+                            // let _ = wr
+                            //     .write_all(
+                            //         encode(RespValue::Array(vec![
+                            //             RespValue::BulkString("subscribe".to_string()),
+                            //             RespValue::BulkString(command[1].to_string()),
+                            //             RespValue::Integers(subscribed_channels_count as i64),
+                            //         ]))
+                            //         .as_bytes(),
+                            //     )
+                            //     .await;
+
+                            // handle_subscribe_loop(
+                            //     wr,
+                            //     rd,
+                            //     pubsub,
+                            //     client_id,
+                            //     tx,
+                            //     rx,
+                            //     subscribed_channels,
+                            // )
+                            // .await;
+                            // return;
                         }
                         "PSYNC" => {
                             let _ = wr
