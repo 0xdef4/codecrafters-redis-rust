@@ -111,9 +111,14 @@ pub async fn handle_stream(
                             return;
                         }
                         "WAIT" => {
-                            execute_wait(command.as_slice(), wr, rd, &replicas, master_repl_offset)
-                                .await;
-                            return;
+                            execute_wait(
+                                command.as_slice(),
+                                &mut wr,
+                                &mut rd,
+                                &replicas,
+                                master_repl_offset,
+                            )
+                            .await;
 
                             // let mut replicas = replicas.lock().await;
 

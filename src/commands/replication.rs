@@ -49,8 +49,8 @@ pub async fn execute_psync(
 
 pub async fn execute_wait(
     command: &[String],
-    mut wr: OwnedWriteHalf,
-    rd: BufReader<OwnedReadHalf>,
+    wr: &mut OwnedWriteHalf,
+    rd: &mut BufReader<OwnedReadHalf>,
     replicas: &Replicas,
     master_repl_offset: usize,
 ) {
