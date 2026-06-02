@@ -39,7 +39,7 @@ pub async fn execute_subscribe(
     rd: &mut BufReader<OwnedReadHalf>,
 ) {
     match command {
-        [cmd] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
+        [cmd, channel_name] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
             let (tx, rx) = mpsc::channel::<(String, String)>(100);
             {
                 let mut pubsub = pubsub.lock().unwrap();
@@ -49,7 +49,7 @@ pub async fn execute_subscribe(
                     .push((*client_id, tx.clone()));
             };
 
-            subscribed_channels.insert(command[1].to_string());
+            subscribed_channels.insert(channel_name.to_string());
             let subscribed_channels_count = subscribed_channels.len();
 
             let _ = wr
