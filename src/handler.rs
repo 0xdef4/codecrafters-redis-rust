@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::aof::append_to_aof;
-use crate::commands::{dispatch_command, execute_subscribe};
+use crate::commands::{dispatch_command, execute_psync, execute_subscribe};
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::replication::propagate_to_replicas;
 use crate::types::{AclDb, Db, Pubsub, Replicas};
@@ -105,61 +105,28 @@ pub async fn handle_stream(
                                 &mut rd,
                             )
                             .await;
-
-                            // let (tx, rx) = mpsc::channel::<(String, String)>(100);
-                            // {
-                            //     let mut pubsub = pubsub.lock().unwrap();
-                            //     pubsub
-                            //         .entry(command[1].to_string())
-                            //         .or_default()
-                            //         .push((client_id, tx.clone()));
-                            // };
-
-                            // subscribed_channels.insert(command[1].to_string());
-                            // let subscribed_channels_count = subscribed_channels.len();
-
+                        }
+                        "PSYNC" => {
+                            execute_psync(command.as_slice(), wr, rd, &replicas).await;
+                            return;
                             // let _ = wr
                             //     .write_all(
-                            //         encode(RespValue::Array(vec![
-                            //             RespValue::BulkString("subscribe".to_string()),
-                            //             RespValue::BulkString(command[1].to_string()),
-                            //             RespValue::Integers(subscribed_channels_count as i64),
-                            //         ]))
+                            //         encode(RespValue::SimpleString(
+                            //             "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"
+                            //                 .to_string(),
+                            //         ))
                             //         .as_bytes(),
                             //     )
                             //     .await;
 
-                            // handle_subscribe_loop(
-                            //     wr,
-                            //     rd,
-                            //     pubsub,
-                            //     client_id,
-                            //     tx,
-                            //     rx,
-                            //     subscribed_channels,
-                            // )
-                            // .await;
+                            // let rdb = hex::decode("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2").unwrap();
+                            // let header = format!("${}\r\n", rdb.len());
+                            // let _ = wr.write_all(header.as_bytes()).await;
+                            // let _ = wr.write_all(&rdb).await;
+
+                            // let mut replicas = replicas.lock().await;
+                            // replicas.push((wr, rd.into_inner()));
                             // return;
-                        }
-                        "PSYNC" => {
-                            let _ = wr
-                                .write_all(
-                                    encode(RespValue::SimpleString(
-                                        "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"
-                                            .to_string(),
-                                    ))
-                                    .as_bytes(),
-                                )
-                                .await;
-
-                            let rdb = hex::decode("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2").unwrap();
-                            let header = format!("${}\r\n", rdb.len());
-                            let _ = wr.write_all(header.as_bytes()).await;
-                            let _ = wr.write_all(&rdb).await;
-
-                            let mut replicas = replicas.lock().await;
-                            replicas.push((wr, rd.into_inner()));
-                            return;
                         }
                         "WAIT" => {
                             let mut replicas = replicas.lock().await;
