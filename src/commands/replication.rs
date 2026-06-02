@@ -22,7 +22,7 @@ pub async fn execute_psync(
     replicas: &Replicas,
 ) {
     match command {
-        [cmd] if cmd.to_uppercase() == "PSYNC".to_string() => {
+        [cmd, _replid, _offset] if cmd.to_uppercase() == "PSYNC".to_string() => {
             let _ = wr
                 .write_all(
                     encode(RespValue::SimpleString(
