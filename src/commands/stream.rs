@@ -4,18 +4,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::Notify;
 use tokio::time::timeout;
 
-use crate::Config;
-use crate::aof::append_to_aof;
 use crate::protocol::RespValue;
 use crate::types::{Db, RedisValue, StreamEntry, ValueType};
-use crate::utils::is_write_command;
 
-pub fn execute_xadd(
-    command: &[String],
-    db: &Db,
-    notify: &Arc<Notify>,
-    config: &Arc<Config>,
-) -> Option<RespValue> {
+pub fn execute_xadd(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option<RespValue> {
     match command {
         [cmd, stream_key, entry_id, pairs @ ..] if cmd.to_uppercase() == "XADD".to_string() => {
             // generate entry id

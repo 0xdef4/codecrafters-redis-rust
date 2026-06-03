@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-
 use tokio::sync::mpsc;
 
 use crate::protocol::RespValue;

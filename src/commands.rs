@@ -76,7 +76,7 @@ pub async fn dispatch_command(
         "LLEN" => execute_llen(command, db),
         "BLPOP" => execute_blpop(command, db, notify).await,
         // stream.rs
-        "XADD" => execute_xadd(command, db, notify, config),
+        "XADD" => execute_xadd(command, db, notify),
         "XRANGE" => execute_xrange(command, db),
         "XREAD" => execute_xread(command, db, notify).await,
         // zset.rs
@@ -87,7 +87,7 @@ pub async fn dispatch_command(
         "ZREM" => execute_zrem(command, db),
         "ZCARD" => execute_zcard(command, db),
         // geo.rs
-        "GEOADD" => execute_geoadd(command, db, config),
+        "GEOADD" => execute_geoadd(command, db),
         "GEOPOS" => execute_geopos(command, db),
         "GEODIST" => execute_geodist(command, db),
         "GEOSEARCH" => execute_geosearch(command, db),
@@ -159,7 +159,7 @@ pub fn dispatch_command_inner(
         "LLEN" => execute_llen(command, db),
 
         // stream.rs (XREAD excluded)
-        "XADD" => execute_xadd(command, db, notify, config),
+        "XADD" => execute_xadd(command, db, notify),
         "XRANGE" => execute_xrange(command, db),
 
         // zset.rs
@@ -171,7 +171,7 @@ pub fn dispatch_command_inner(
         "ZCARD" => execute_zcard(command, db),
 
         // geo.rs
-        "GEOADD" => execute_geoadd(command, db, config),
+        "GEOADD" => execute_geoadd(command, db),
         "GEOPOS" => execute_geopos(command, db),
         "GEODIST" => execute_geodist(command, db),
         "GEOSEARCH" => execute_geosearch(command, db),

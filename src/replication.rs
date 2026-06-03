@@ -1,8 +1,8 @@
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::types::{Db, RedisValue, ValueType};

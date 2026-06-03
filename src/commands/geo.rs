@@ -1,16 +1,11 @@
-use std::sync::Arc;
-
-use crate::Config;
-use crate::aof::append_to_aof;
 use crate::geospatial::{
     Coordinates, decode as geo_decode, encode as geo_encode, haversine,
     {is_valid_latitude, is_valid_longitude},
 };
 use crate::protocol::RespValue;
 use crate::types::{Db, RedisValue, ValueType, Zset};
-use crate::utils::is_write_command;
 
-pub fn execute_geoadd(command: &[String], db: &Db, config: &Arc<Config>) -> Option<RespValue> {
+pub fn execute_geoadd(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
         [cmd, zset_key, longitude, latitude, member]
             if cmd.to_uppercase() == "GEOADD".to_string() =>

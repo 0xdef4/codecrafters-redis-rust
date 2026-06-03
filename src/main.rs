@@ -1,8 +1,8 @@
-use tokio::net::TcpListener;
-use tokio::sync::{Mutex as TokioMutex, Notify};
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+use tokio::net::TcpListener;
+use tokio::sync::{Mutex as TokioMutex, Notify};
 
 mod acl;
 mod aof;

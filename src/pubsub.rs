@@ -1,8 +1,8 @@
+use std::collections::HashSet;
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::mpsc;
-
-use std::collections::HashSet;
 
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::types::Pubsub;
