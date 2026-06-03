@@ -59,14 +59,9 @@ pub async fn dispatch_command(
     notify: &Arc<Notify>,
     config: &Arc<Config>,
     role: &str,
-    // in_multi: &mut bool,
-    // command_queue: &mut Vec<Vec<String>>,
-    // watched_keys: &mut HashMap<String, u64>,
-    // replicas: &Replicas,
     pubsub: &Pubsub,
     acl_db: &AclDb,
     client_state: &mut ClientState,
-    // is_authenticated: &mut bool,
 ) -> Option<RespValue> {
     match command[0].to_uppercase().as_str() {
         // string.rs

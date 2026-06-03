@@ -59,21 +59,6 @@ pub async fn handle_stream(
         }
     });
 
-    // let mut in_multi: bool = false;
-    // let mut command_queue: Vec<Vec<String>> = Vec::new();
-    // let mut subscribed_channels: HashSet<String> = HashSet::new();
-    // let mut master_repl_offset: usize = 0;
-    // let mut is_authenticated: bool = {
-    //     let acl_db = acl_db.lock().unwrap();
-
-    //     if let Some(acl_user) = acl_db.get(&"default".to_string()) {
-    //         acl_user.get_flags().contains(&"nopass".to_string())
-    //     } else {
-    //         false
-    //     }
-    // };
-    // let mut watched_keys: HashMap<String, u64> = HashMap::new();
-
     let (rd, mut wr) = stream.into_split();
     let mut rd = BufReader::new(rd);
 
@@ -157,11 +142,8 @@ pub async fn handle_stream(
                                 &notify,
                                 &config,
                                 &role,
-                                // &mut in_multi,
-                                // &mut command_queue,
-                                // &mut watched_keys,
                                 &pubsub,
-                                &acl_db, // &mut is_authenticated,
+                                &acl_db,
                                 &mut client_state,
                             )
                             .await;
