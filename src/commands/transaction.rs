@@ -10,7 +10,7 @@ use crate::types::Db;
 
 pub fn execute_multi(command: &[String], in_multi: &mut bool) -> Option<RespValue> {
     match command {
-        [cmd] if cmd.to_uppercase() == "MULTI".to_string() => {
+        [cmd] if cmd.to_uppercase() == "MULTI" => {
             *in_multi = true;
 
             Some(RespValue::SimpleString("OK".to_string()))
@@ -29,7 +29,7 @@ pub async fn execute_exec(
     watched_keys: &mut HashMap<String, u64>,
 ) -> Option<RespValue> {
     match command {
-        [cmd] if cmd.to_uppercase() == "EXEC".to_string() => {
+        [cmd] if cmd.to_uppercase() == "EXEC" => {
             let mut responses = Vec::new();
 
             if *in_multi {
@@ -74,7 +74,7 @@ pub fn execute_discard(
     watched_keys: &mut HashMap<String, u64>,
 ) -> Option<RespValue> {
     match command {
-        [cmd] if cmd.to_uppercase() == "DISCARD".to_string() => {
+        [cmd] if cmd.to_uppercase() == "DISCARD" => {
             if *in_multi {
                 command_queue.clear();
                 watched_keys.clear();
@@ -99,7 +99,7 @@ pub fn execute_watch(
     watched_keys: &mut HashMap<String, u64>,
 ) -> Option<RespValue> {
     match command {
-        [cmd, keys @ ..] if cmd.to_uppercase() == "WATCH".to_string() => {
+        [cmd, keys @ ..] if cmd.to_uppercase() == "WATCH" => {
             if *in_multi {
                 Some(RespValue::SimpleError(
                     "ERR WATCH inside MULTI is not allowed".to_string(),
@@ -137,7 +137,7 @@ pub fn execute_unwatch(
     watched_keys: &mut HashMap<String, u64>,
 ) -> Option<RespValue> {
     match command {
-        [cmd] if cmd.to_uppercase() == "UNWATCH".to_string() => {
+        [cmd] if cmd.to_uppercase() == "UNWATCH" => {
             watched_keys.clear();
 
             Some(RespValue::SimpleString("OK".to_string()))

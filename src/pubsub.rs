@@ -28,7 +28,7 @@ pub async fn handle_subscribe_loop(
                        match command.as_slice() {
                            [cmd, channel_name]
                                if cmd.to_uppercase()
-                                   == "SUBSCRIBE".to_string() =>
+                                   == "SUBSCRIBE" =>
                            {
                                {
                                    let mut pubsub = pubsub.lock().unwrap();
@@ -63,7 +63,7 @@ pub async fn handle_subscribe_loop(
                            }
                            [cmd, channel_name]
                                if cmd.to_uppercase()
-                                   == "UNSUBSCRIBE".to_string() => {
+                                   == "UNSUBSCRIBE" => {
                                 {
                                    let mut pubsub = pubsub.lock().unwrap();
                                    if let Some(list) = pubsub.get_mut(channel_name) {
@@ -94,12 +94,12 @@ pub async fn handle_subscribe_loop(
                             }
                            [cmd]
                                if cmd.to_uppercase()
-                                   == "PSUBSCRIBE".to_string() => {}
+                                   == "PSUBSCRIBE" => {}
                            [cmd]
                                if cmd.to_uppercase()
-                                   == "PUNSUBSCRIBE".to_string() => {}
+                                   == "PUNSUBSCRIBE" => {}
                            [cmd]
-                               if cmd.to_uppercase() == "PING".to_string() =>
+                               if cmd.to_uppercase() == "PING" =>
                            {
                                let _ = wr
                                    .write_all(
@@ -116,7 +116,7 @@ pub async fn handle_subscribe_loop(
                                    .await;
                            }
                            [cmd]
-                               if cmd.to_uppercase() == "QUIT".to_string() => {
+                               if cmd.to_uppercase() == "QUIT" => {
                            }
                            _ => {
                                if let [cmd, _rest @ ..] = command.as_slice()

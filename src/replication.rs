@@ -113,7 +113,7 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                         println!("command (in replica): {:?}", command);
 
                         match command.as_slice() {
-                            [cmd] if cmd.to_uppercase() == "PING".to_string() => {
+                            [cmd] if cmd.to_uppercase() == "PING" => {
                                 // calculate the byte size of the command
                                 let byte_size_of_command = encode(RespValue::Array(
                                     command
@@ -127,7 +127,7 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                                 track_total_bytes += byte_size_of_command;
                             }
                             [cmd, key, value, optional_args @ ..]
-                                if cmd.to_uppercase() == "SET".to_string() =>
+                                if cmd.to_uppercase() == "SET" =>
                             {
                                 match optional_args {
                                     [] => {
@@ -179,8 +179,8 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                                 track_total_bytes += byte_size_of_command;
                             }
                             [cmd, subcmd, arg]
-                                if cmd.to_uppercase() == "REPLCONF".to_string()
-                                    && subcmd.to_uppercase() == "GETACK".to_string() =>
+                                if cmd.to_uppercase() == "REPLCONF"
+                                    && subcmd.to_uppercase() == "GETACK" =>
                             {
                                 master_stream
                                     .write_all(

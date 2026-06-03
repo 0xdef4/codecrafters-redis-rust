@@ -4,15 +4,11 @@ use crate::types::AclDb;
 
 pub fn execute_acl(command: &[String], acl_db: &AclDb) -> Option<RespValue> {
     match command {
-        [cmd, sub_cmd]
-            if cmd.to_uppercase() == "ACL".to_string()
-                && sub_cmd.to_uppercase() == "WHOAMI".to_string() =>
-        {
+        [cmd, sub_cmd] if cmd.to_uppercase() == "ACL" && sub_cmd.to_uppercase() == "WHOAMI" => {
             Some(RespValue::BulkString("default".to_string()))
         }
         [cmd, sub_cmd, username]
-            if cmd.to_uppercase() == "ACL".to_string()
-                && sub_cmd.to_uppercase() == "GETUSER".to_string() =>
+            if cmd.to_uppercase() == "ACL" && sub_cmd.to_uppercase() == "GETUSER" =>
         {
             let user = {
                 let acl_db = acl_db.lock().unwrap();
@@ -42,8 +38,7 @@ pub fn execute_acl(command: &[String], acl_db: &AclDb) -> Option<RespValue> {
             ]))
         }
         [cmd, sub_cmd, username, rest @ ..]
-            if cmd.to_uppercase() == "ACL".to_string()
-                && sub_cmd.to_uppercase() == "SETUSER".to_string() =>
+            if cmd.to_uppercase() == "ACL" && sub_cmd.to_uppercase() == "SETUSER" =>
         {
             for ele in rest {
                 if let Some(password) = ele.strip_prefix(">") {
@@ -70,7 +65,7 @@ pub fn execute_auth(
     is_authenticated: &mut bool,
 ) -> Option<RespValue> {
     match command {
-        [cmd, username, password] if cmd.to_uppercase() == "AUTH".to_string() => {
+        [cmd, username, password] if cmd.to_uppercase() == "AUTH" => {
             let user = {
                 let acl_db = acl_db.lock().unwrap();
 

@@ -6,26 +6,22 @@ use crate::types::{Db, ValueType};
 
 pub fn execute_ping(command: &[String]) -> Option<RespValue> {
     match command {
-        [cmd] if cmd.to_uppercase() == "PING".to_string() => {
-            Some(RespValue::SimpleString("PONG".to_string()))
-        }
+        [cmd] if cmd.to_uppercase() == "PING" => Some(RespValue::SimpleString("PONG".to_string())),
         _ => unreachable!(),
     }
 }
 
 pub fn execute_echo(command: &[String]) -> Option<RespValue> {
     match command {
-        [cmd, arg] if cmd.to_uppercase() == "ECHO".to_string() => {
-            Some(RespValue::BulkString(arg.clone()))
-        }
+        [cmd, arg] if cmd.to_uppercase() == "ECHO" => Some(RespValue::BulkString(arg.clone())),
         _ => unreachable!(),
     }
 }
 
 pub fn execute_info(command: &[String], role: &str) -> Option<RespValue> {
     match command {
-        [cmd, optional] if cmd.to_uppercase() == "INFO".to_string() => match optional {
-            option if option.to_uppercase() == "REPLICATION".to_string() => match role {
+        [cmd, optional] if cmd.to_uppercase() == "INFO" => match optional {
+            option if option.to_uppercase() == "REPLICATION" => match role {
                 "slave" => Some(RespValue::BulkString("role:slave".to_string())),
                 "master" => {
                     Some(RespValue::BulkString("role:master\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0".to_string()))
@@ -45,8 +41,7 @@ pub fn execute_info(command: &[String], role: &str) -> Option<RespValue> {
 pub fn execute_config(command: &[String], config: &Arc<Config>) -> Option<RespValue> {
     match command {
         [cmd, subcmd, rest @ ..]
-            if cmd.to_uppercase() == "CONFIG".to_string()
-                && subcmd.to_uppercase() == "GET".to_string() =>
+            if cmd.to_uppercase() == "CONFIG" && subcmd.to_uppercase() == "GET" =>
         {
             match rest {
                 [] => {
@@ -110,7 +105,7 @@ pub fn execute_keys(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_type(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, list_key] if cmd.to_uppercase() == "TYPE".to_string() => {
+        [cmd, list_key] if cmd.to_uppercase() == "TYPE" => {
             let type_of_value = {
                 let db = db.lock().unwrap();
 

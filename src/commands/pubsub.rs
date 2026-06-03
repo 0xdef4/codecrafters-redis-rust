@@ -11,7 +11,7 @@ use crate::types::Pubsub;
 
 pub async fn execute_publish(command: &[String], pubsub: &Pubsub) -> Option<RespValue> {
     match command {
-        [cmd, channel_name, message_contents] if cmd.to_uppercase() == "PUBLISH".to_string() => {
+        [cmd, channel_name, message_contents] if cmd.to_uppercase() == "PUBLISH" => {
             let tx_list = {
                 let pubsub = pubsub.lock().unwrap();
                 pubsub.get(channel_name).cloned().unwrap_or_default()
@@ -38,7 +38,7 @@ pub async fn execute_subscribe(
     rd: &mut BufReader<OwnedReadHalf>,
 ) {
     match command {
-        [cmd, channel_name] if cmd.to_uppercase() == "SUBSCRIBE".to_string() => {
+        [cmd, channel_name] if cmd.to_uppercase() == "SUBSCRIBE" => {
             let (tx, rx) = mpsc::channel::<(String, String)>(100);
             {
                 let mut pubsub = pubsub.lock().unwrap();

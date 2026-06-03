@@ -7,10 +7,8 @@ pub type AclDb = Arc<Mutex<HashMap<String, AclUser>>>;
 
 #[derive(Debug, Clone)]
 pub struct AclUser {
-    flags: Vec<String>, // "on", "nopass", "allkeys" etc
+    flags: Vec<String>,     // "on", "nopass", "allkeys" etc
     passwords: Vec<String>, // hashed passwords
-                        // commands: String,       // "@all", "-@dangerous" etc
-                        // keys: String,           // "*" etc
 }
 
 impl AclUser {
@@ -18,8 +16,6 @@ impl AclUser {
         Self {
             flags: vec!["nopass".to_string()],
             passwords: vec![],
-            // commands: "".to_string(),
-            // keys: "".to_string(),
         }
     }
 

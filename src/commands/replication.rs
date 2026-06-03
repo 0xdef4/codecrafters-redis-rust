@@ -9,7 +9,7 @@ use crate::protocol::{RespValue, decode_arrays, encode};
 
 pub fn execute_replconf(command: &[String]) -> Option<RespValue> {
     match command {
-        [cmd, rest @ ..] if cmd.to_uppercase() == "REPLCONF".to_string() => {
+        [cmd, rest @ ..] if cmd.to_uppercase() == "REPLCONF" => {
             Some(RespValue::SimpleString("OK".to_string()))
         }
         _ => unreachable!(),
@@ -23,7 +23,7 @@ pub async fn execute_psync(
     replicas: &Replicas,
 ) {
     match command {
-        [cmd, _replid, _offset] if cmd.to_uppercase() == "PSYNC".to_string() => {
+        [cmd, _replid, _offset] if cmd.to_uppercase() == "PSYNC" => {
             let _ = wr
                 .write_all(
                     encode(RespValue::SimpleString(
@@ -53,7 +53,7 @@ pub async fn execute_wait(
     master_repl_offset: usize,
 ) {
     match command {
-        [cmd, numreplicas, timeout] if cmd.to_uppercase() == "WAIT".to_string() => {
+        [cmd, numreplicas, timeout] if cmd.to_uppercase() == "WAIT" => {
             let mut replicas = replicas.lock().await;
 
             if master_repl_offset == 0 {

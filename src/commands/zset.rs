@@ -3,7 +3,7 @@ use crate::types::{Db, RedisValue, ValueType, Zset};
 
 pub fn execute_zadd(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, score, member] if cmd.to_uppercase() == "ZADD".to_string() => {
+        [cmd, zset_key, score, member] if cmd.to_uppercase() == "ZADD" => {
             let num_new_members_added = {
                 let mut db = db.lock().unwrap();
 
@@ -31,7 +31,7 @@ pub fn execute_zadd(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_zrank(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, member] if cmd.to_uppercase() == "ZRANK".to_string() => {
+        [cmd, zset_key, member] if cmd.to_uppercase() == "ZRANK" => {
             let response: Option<usize> = {
                 let db = db.lock().unwrap();
                 if let Some(redis_value) = db.get(zset_key) {
@@ -56,7 +56,7 @@ pub fn execute_zrank(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_zrange(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, start_index, stop_index] if cmd.to_uppercase() == "ZRANGE".to_string() => {
+        [cmd, zset_key, start_index, stop_index] if cmd.to_uppercase() == "ZRANGE" => {
             let ranged = {
                 let db = db.lock().unwrap();
                 if let Some(redis_value) = db.get(zset_key) {
@@ -84,7 +84,7 @@ pub fn execute_zrange(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_zscore(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, member] if cmd.to_uppercase() == "ZSCORE".to_string() => {
+        [cmd, zset_key, member] if cmd.to_uppercase() == "ZSCORE" => {
             let score: Option<f64> = {
                 let db = db.lock().unwrap();
                 if let Some(redis_value) = db.get(zset_key) {
@@ -109,7 +109,7 @@ pub fn execute_zscore(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_zrem(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, member] if cmd.to_uppercase() == "ZREM".to_string() => {
+        [cmd, zset_key, member] if cmd.to_uppercase() == "ZREM" => {
             let num_members_removed = {
                 let mut db = db.lock().unwrap();
 
@@ -132,7 +132,7 @@ pub fn execute_zrem(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_zcard(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key] if cmd.to_uppercase() == "ZCARD".to_string() => {
+        [cmd, zset_key] if cmd.to_uppercase() == "ZCARD" => {
             let num_of_elements = {
                 let db = db.lock().unwrap();
                 if let Some(redis_value) = db.get(zset_key) {

@@ -9,7 +9,7 @@ use crate::types::{Db, RedisValue, StreamEntry, ValueType};
 
 pub fn execute_xadd(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option<RespValue> {
     match command {
-        [cmd, stream_key, entry_id, pairs @ ..] if cmd.to_uppercase() == "XADD".to_string() => {
+        [cmd, stream_key, entry_id, pairs @ ..] if cmd.to_uppercase() == "XADD" => {
             // generate entry id
             let (generated_milliseconds, generated_sqeuence_number) = {
                 let (current_milliseconds, current_sequence_number) = match entry_id.split_once("-")
@@ -224,7 +224,7 @@ pub fn execute_xadd(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option
 
 pub fn execute_xrange(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, stream_key, start_id, end_id] if cmd.to_uppercase() == "XRANGE".to_string() => {
+        [cmd, stream_key, start_id, end_id] if cmd.to_uppercase() == "XRANGE" => {
             let filtered = {
                 let db = db.lock().unwrap();
 
@@ -293,7 +293,7 @@ pub fn execute_xrange(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub async fn execute_xread(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option<RespValue> {
     match command {
-        [cmd, rest @ ..] if cmd.to_uppercase() == "XREAD".to_string() => {
+        [cmd, rest @ ..] if cmd.to_uppercase() == "XREAD" => {
             let (block_ms, rest) = if rest[0].to_uppercase() == "BLOCK" {
                 (Some(rest[1].parse::<u64>().unwrap_or(0)), &rest[3..]) // skip BLOCK ms STREAMS
             } else {

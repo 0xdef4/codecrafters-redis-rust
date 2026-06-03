@@ -9,7 +9,7 @@ use crate::types::{Db, RedisValue, ValueType};
 
 pub fn execute_lpush(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option<RespValue> {
     match command {
-        [cmd, list_key, list_values @ ..] if cmd.to_uppercase() == "LPUSH".to_string() => {
+        [cmd, list_key, list_values @ ..] if cmd.to_uppercase() == "LPUSH" => {
             let list_length = {
                 let mut db = db.lock().unwrap();
 
@@ -49,7 +49,7 @@ pub fn execute_lpush(command: &[String], db: &Db, notify: &Arc<Notify>) -> Optio
 
 pub fn execute_rpush(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option<RespValue> {
     match command {
-        [cmd, list_key, list_values @ ..] if cmd.to_uppercase() == "RPUSH".to_string() => {
+        [cmd, list_key, list_values @ ..] if cmd.to_uppercase() == "RPUSH" => {
             let list_length = {
                 let mut db = db.lock().unwrap();
 
@@ -88,7 +88,7 @@ pub fn execute_rpush(command: &[String], db: &Db, notify: &Arc<Notify>) -> Optio
 
 pub fn execute_lpop(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, list_key, optional_args @ ..] if cmd.to_uppercase() == "LPOP".to_string() => {
+        [cmd, list_key, optional_args @ ..] if cmd.to_uppercase() == "LPOP" => {
             match optional_args {
                 [] => {
                     let removed: Option<String> = {
@@ -150,7 +150,7 @@ pub fn execute_lpop(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_lrange(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, list_key, start_index, stop_index] if cmd.to_uppercase() == "LRANGE".to_string() => {
+        [cmd, list_key, start_index, stop_index] if cmd.to_uppercase() == "LRANGE" => {
             let slice = {
                 let db = db.lock().unwrap();
 
@@ -207,7 +207,7 @@ pub fn execute_lrange(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_llen(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, list_key] if cmd.to_uppercase() == "LLEN".to_string() => {
+        [cmd, list_key] if cmd.to_uppercase() == "LLEN" => {
             let response = {
                 let db = db.lock().unwrap();
 
@@ -228,7 +228,7 @@ pub fn execute_llen(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub async fn execute_blpop(command: &[String], db: &Db, notify: &Arc<Notify>) -> Option<RespValue> {
     match command {
-        [cmd, list_key, timeout_seconds] if cmd.to_uppercase() == "BLPOP".to_string() => {
+        [cmd, list_key, timeout_seconds] if cmd.to_uppercase() == "BLPOP" => {
             let seconds: f64 = timeout_seconds.parse().unwrap();
             let removed = {
                 loop {

@@ -7,9 +7,7 @@ use crate::types::{Db, RedisValue, ValueType, Zset};
 
 pub fn execute_geoadd(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, longitude, latitude, member]
-            if cmd.to_uppercase() == "GEOADD".to_string() =>
-        {
+        [cmd, zset_key, longitude, latitude, member] if cmd.to_uppercase() == "GEOADD" => {
             if !is_valid_longitude(longitude.parse().unwrap()) {
                 return Some(RespValue::SimpleError(format!("ERR invalid longitude")));
             }
@@ -57,7 +55,7 @@ pub fn execute_geoadd(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_geopos(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, members @ ..] if cmd.to_uppercase() == "GEOPOS".to_string() => {
+        [cmd, zset_key, members @ ..] if cmd.to_uppercase() == "GEOPOS" => {
             let mut output = vec![];
             for member in members {
                 let score: Option<f64> = {
@@ -99,7 +97,7 @@ pub fn execute_geopos(command: &[String], db: &Db) -> Option<RespValue> {
 
 pub fn execute_geodist(command: &[String], db: &Db) -> Option<RespValue> {
     match command {
-        [cmd, zset_key, origin, destination] if cmd.to_uppercase() == "GEODIST".to_string() => {
+        [cmd, zset_key, origin, destination] if cmd.to_uppercase() == "GEODIST" => {
             let origin_score = {
                 let db = db.lock().unwrap();
 
@@ -154,9 +152,9 @@ pub fn execute_geosearch(command: &[String], db: &Db) -> Option<RespValue> {
             option_2,
             radius,
             unit,
-        ] if cmd.to_uppercase() == "GEOSEARCH".to_string()
-            && option_1.to_uppercase() == "FROMLONLAT".to_string()
-            && option_2.to_uppercase() == "BYRADIUS".to_string() =>
+        ] if cmd.to_uppercase() == "GEOSEARCH"
+            && option_1.to_uppercase() == "FROMLONLAT"
+            && option_2.to_uppercase() == "BYRADIUS" =>
         {
             let center_coord =
                 Coordinates::new(latitude.parse().unwrap(), longitude.parse().unwrap());
