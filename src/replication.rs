@@ -1,11 +1,11 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use crate::commands::execute_set;
 use crate::protocol::{RespValue, decode_arrays, encode};
-use crate::types::{Db, RedisValue, ValueType};
+use crate::types::Db;
 use crate::{Config, Replicas};
 
 pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
@@ -112,69 +112,22 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                     for command in commands {
                         println!("command (in replica): {:?}", command);
 
-                        match command.as_slice() {
-                            [cmd] if cmd.to_uppercase() == "PING" => {
-                                // calculate the byte size of the command
-                                let byte_size_of_command = encode(RespValue::Array(
-                                    command
-                                        .iter()
-                                        .map(|e| RespValue::BulkString(e.to_string()))
-                                        .collect::<Vec<_>>(),
-                                ))
-                                .as_bytes()
-                                .len();
+                        // calculate the byte size of the command
+                        let byte_size_of_command = encode(RespValue::Array(
+                            command
+                                .iter()
+                                .map(|e| RespValue::BulkString(e.to_string()))
+                                .collect::<Vec<_>>(),
+                        ))
+                        .as_bytes()
+                        .len();
 
+                        match command.as_slice() {
+                            [cmd, ..] if cmd.to_uppercase() == "PING" => {
                                 track_total_bytes += byte_size_of_command;
                             }
-                            [cmd, key, value, optional_args @ ..]
-                                if cmd.to_uppercase() == "SET" =>
-                            {
-                                match optional_args {
-                                    [] => {
-                                        let redis_value = RedisValue::new(
-                                            ValueType::String(value.to_string()),
-                                            None,
-                                        );
-
-                                        let mut db = db.lock().unwrap();
-                                        db.insert(key.to_string(), redis_value);
-                                    }
-                                    [option, seconds] if option.to_uppercase() == "EX" => {
-                                        let now = Instant::now();
-                                        let expires_at =
-                                            now + Duration::from_secs(seconds.parse().unwrap());
-
-                                        let redis_value = RedisValue::new(
-                                            ValueType::String(value.to_string()),
-                                            Some(expires_at),
-                                        );
-                                        let mut db = db.lock().unwrap();
-                                        db.insert(key.to_string(), redis_value);
-                                    }
-                                    [option, milliseconds] if option.to_uppercase() == "PX" => {
-                                        let now = Instant::now();
-                                        let expires_at = now
-                                            + Duration::from_millis(milliseconds.parse().unwrap());
-
-                                        let redis_value = RedisValue::new(
-                                            ValueType::String(value.to_string()),
-                                            Some(expires_at),
-                                        );
-                                        let mut db = db.lock().unwrap();
-                                        db.insert(key.to_string(), redis_value);
-                                    }
-                                    _ => unreachable!(),
-                                }
-
-                                // calculate the byte size of the command
-                                let byte_size_of_command = encode(RespValue::Array(
-                                    command
-                                        .iter()
-                                        .map(|e| RespValue::BulkString(e.to_string()))
-                                        .collect::<Vec<_>>(),
-                                ))
-                                .as_bytes()
-                                .len();
+                            [cmd, ..] if cmd.to_uppercase() == "SET" => {
+                                let _ = execute_set(&command, &db);
 
                                 track_total_bytes += byte_size_of_command;
                             }
@@ -193,16 +146,6 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                                     )
                                     .await
                                     .unwrap();
-
-                                // calculate the byte size of the command
-                                let byte_size_of_command = encode(RespValue::Array(
-                                    command
-                                        .iter()
-                                        .map(|e| RespValue::BulkString(e.to_string()))
-                                        .collect::<Vec<_>>(),
-                                ))
-                                .as_bytes()
-                                .len();
 
                                 track_total_bytes += byte_size_of_command;
                             }
