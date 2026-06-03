@@ -180,9 +180,9 @@ pub fn execute_xadd(
                 return Some(RespValue::SimpleError(error_message));
             }
 
-            if config.appendonly == "yes" && is_write_command(&command) {
-                append_to_aof(&command, &config);
-            }
+            // if config.appendonly == "yes" && is_write_command(&command) {
+            //     append_to_aof(&command, &config);
+            // }
 
             // respond
             let response = {

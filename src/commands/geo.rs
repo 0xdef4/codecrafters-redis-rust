@@ -50,9 +50,9 @@ pub fn execute_geoadd(command: &[String], db: &Db, config: &Arc<Config>) -> Opti
                 }
             };
 
-            if config.appendonly == "yes" && is_write_command(&command) {
-                append_to_aof(&command, &config);
-            }
+            // if config.appendonly == "yes" && is_write_command(&command) {
+            //     append_to_aof(&command, &config);
+            // }
 
             Some(RespValue::Integers(num_new_members_added as i64))
         }
