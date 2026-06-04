@@ -98,63 +98,68 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
         master_stream.read_exact(&mut rdb_buf).await.unwrap();
         // println!("RDB read: {} bytes", rdb_len);
 
-        // track total byte size received from master
-        let mut track_total_bytes = 0;
+        start_replica_loop(master_stream, db).await;
+    }
+}
 
-        loop {
-            match master_stream.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
-                    let received = String::from_utf8_lossy(&buf[..n]);
-                    println!("received (in replica): {:?}", received);
+async fn start_replica_loop(mut master_stream: TcpStream, db: Db) {
+    // track total byte size received from master
+    let mut track_total_bytes = 0;
 
-                    let commands = decode_arrays(&received);
-                    for command in commands {
-                        println!("command (in replica): {:?}", command);
+    let mut buf = [0u8; 512];
+    loop {
+        match master_stream.read(&mut buf).await {
+            Ok(0) => break,
+            Ok(n) => {
+                let received = String::from_utf8_lossy(&buf[..n]);
+                println!("received (in replica): {:?}", received);
 
-                        // calculate the byte size of the command
-                        let byte_size_of_command = encode(RespValue::Array(
-                            command
-                                .iter()
-                                .map(|e| RespValue::BulkString(e.to_string()))
-                                .collect::<Vec<_>>(),
-                        ))
-                        .as_bytes()
-                        .len();
+                let commands = decode_arrays(&received);
+                for command in commands {
+                    println!("command (in replica): {:?}", command);
 
-                        match command.as_slice() {
-                            [cmd, ..] if cmd.to_uppercase() == "PING" => {
-                                track_total_bytes += byte_size_of_command;
-                            }
-                            [cmd, ..] if cmd.to_uppercase() == "SET" => {
-                                let _ = execute_set(&command, &db);
+                    // calculate the byte size of the command
+                    let byte_size_of_command = encode(RespValue::Array(
+                        command
+                            .iter()
+                            .map(|e| RespValue::BulkString(e.to_string()))
+                            .collect::<Vec<_>>(),
+                    ))
+                    .as_bytes()
+                    .len();
 
-                                track_total_bytes += byte_size_of_command;
-                            }
-                            [cmd, subcmd, arg]
-                                if cmd.to_uppercase() == "REPLCONF"
-                                    && subcmd.to_uppercase() == "GETACK" =>
-                            {
-                                master_stream
-                                    .write_all(
-                                        encode(RespValue::Array(vec![
-                                            RespValue::BulkString("REPLCONF".to_string()),
-                                            RespValue::BulkString("ACK".to_string()),
-                                            RespValue::BulkString(track_total_bytes.to_string()),
-                                        ]))
-                                        .as_bytes(),
-                                    )
-                                    .await
-                                    .unwrap();
-
-                                track_total_bytes += byte_size_of_command;
-                            }
-                            _ => {}
+                    match command.as_slice() {
+                        [cmd, ..] if cmd.to_uppercase() == "PING" => {
+                            track_total_bytes += byte_size_of_command;
                         }
+                        [cmd, ..] if cmd.to_uppercase() == "SET" => {
+                            let _ = execute_set(&command, &db);
+
+                            track_total_bytes += byte_size_of_command;
+                        }
+                        [cmd, subcmd, arg]
+                            if cmd.to_uppercase() == "REPLCONF"
+                                && subcmd.to_uppercase() == "GETACK" =>
+                        {
+                            master_stream
+                                .write_all(
+                                    encode(RespValue::Array(vec![
+                                        RespValue::BulkString("REPLCONF".to_string()),
+                                        RespValue::BulkString("ACK".to_string()),
+                                        RespValue::BulkString(track_total_bytes.to_string()),
+                                    ]))
+                                    .as_bytes(),
+                                )
+                                .await
+                                .unwrap();
+
+                            track_total_bytes += byte_size_of_command;
+                        }
+                        _ => {}
                     }
                 }
-                Err(_) => break,
             }
+            Err(_) => break,
         }
     }
 }
