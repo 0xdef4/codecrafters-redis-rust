@@ -39,7 +39,9 @@ async fn main() {
     rdb::load_if_exists(&db, &config);
     replication::start_if_replica(&db, Arc::clone(&config));
 
-    aof::init_aof_if_enabled(&config);
+    if let Err(e) = aof::init_aof_if_enabled(&config) {
+        eprintln!("error initializing aof: {}", e);
+    }
     aof::replay_commands(&config, &db, &notify);
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
@@ -57,7 +59,7 @@ async fn main() {
                 let acl_db = Arc::clone(&acl_db);
 
                 tokio::spawn(async move {
-                    handle_stream(
+                    if let Err(e) = handle_stream(
                         stream,
                         db,
                         notify,
@@ -67,7 +69,10 @@ async fn main() {
                         pubsub,
                         acl_db,
                     )
-                    .await;
+                    .await
+                    {
+                        eprintln!("client error: {e}");
+                    }
                 });
             }
             Err(e) => println!("couldn't get client: {:?}", e),

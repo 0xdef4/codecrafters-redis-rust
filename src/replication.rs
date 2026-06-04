@@ -3,15 +3,17 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use anyhow::Result;
+
 use crate::commands::execute_set;
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::types::Db;
 use crate::{Config, Replicas};
 
-pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
+pub async fn start_replica_handshake(config: Arc<Config>, db: Db) -> Result<()> {
     if let Some((master_ip, master_port)) = config.replicaof.as_ref().unwrap().split_once(' ') {
         let master_addr = format!("{}:{}", master_ip, master_port);
-        let mut master_stream = TcpStream::connect(master_addr).await.unwrap();
+        let mut master_stream = TcpStream::connect(master_addr).await?;
 
         // send PING
         master_stream
@@ -21,8 +23,7 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                 )]))
                 .as_bytes(),
             )
-            .await
-            .unwrap();
+            .await?;
 
         let mut buf = [0u8; 512];
         master_stream.read(&mut buf).await.unwrap();
@@ -37,10 +38,9 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                 ]))
                 .as_bytes(),
             )
-            .await
-            .unwrap();
+            .await?;
 
-        master_stream.read(&mut buf).await.unwrap();
+        master_stream.read(&mut buf).await?;
 
         // send REPLCONF capa psync2
         master_stream
@@ -52,10 +52,9 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                 ]))
                 .as_bytes(),
             )
-            .await
-            .unwrap();
+            .await?;
 
-        master_stream.read(&mut buf).await.unwrap();
+        master_stream.read(&mut buf).await?;
 
         // send PSYNC <replication_id> <offset>
         master_stream
@@ -67,13 +66,12 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
                 ]))
                 .as_bytes(),
             )
-            .await
-            .unwrap();
+            .await?;
 
         // wait for FULLRESYNC response
         let mut line = String::new();
         loop {
-            let b = master_stream.read_u8().await.unwrap();
+            let b = master_stream.read_u8().await?;
             line.push(b as char);
             if line.ends_with("\r\n") {
                 break;
@@ -84,25 +82,29 @@ pub async fn start_replica_handshake(config: Arc<Config>, db: Db) {
         // read RDB header: $<len>\r\n
         let mut rdb_header = String::new();
         loop {
-            let b = master_stream.read_u8().await.unwrap();
+            let b = master_stream.read_u8().await?;
             rdb_header.push(b as char);
             if rdb_header.ends_with("\r\n") {
                 break;
             }
         }
         // parse RDB header for RDB length: "$88\r\n" -> 88 파싱
-        let rdb_len: usize = rdb_header.trim_start_matches('$').trim().parse().unwrap();
+        let rdb_len: usize = rdb_header.trim_start_matches('$').trim().parse()?;
 
         // wait for RDB binary using exact length
         let mut rdb_buf = vec![0u8; rdb_len];
-        master_stream.read_exact(&mut rdb_buf).await.unwrap();
+        master_stream.read_exact(&mut rdb_buf).await?;
         // println!("RDB read: {} bytes", rdb_len);
 
-        start_replica_loop(master_stream, db).await;
+        if let Err(e) = start_replica_loop(master_stream, db).await {
+            eprintln!("error starting replica loop: {}", e);
+        }
     }
+
+    Ok(())
 }
 
-async fn start_replica_loop(mut master_stream: TcpStream, db: Db) {
+async fn start_replica_loop(mut master_stream: TcpStream, db: Db) -> Result<()> {
     // track total byte size received from master
     let mut track_total_bytes = 0;
 
@@ -150,8 +152,7 @@ async fn start_replica_loop(mut master_stream: TcpStream, db: Db) {
                                     ]))
                                     .as_bytes(),
                                 )
-                                .await
-                                .unwrap();
+                                .await?;
 
                             track_total_bytes += byte_size_of_command;
                         }
@@ -162,6 +163,7 @@ async fn start_replica_loop(mut master_stream: TcpStream, db: Db) {
             Err(_) => break,
         }
     }
+    Ok(())
 }
 
 pub fn start_if_replica(db: &Db, config: Arc<Config>) {
@@ -171,7 +173,9 @@ pub fn start_if_replica(db: &Db, config: Arc<Config>) {
 
     let db = Arc::clone(db);
     tokio::spawn(async move {
-        start_replica_handshake(config, db).await;
+        if let Err(e) = start_replica_handshake(config, db).await {
+            eprint!("error starting replica handshake :{e}");
+        }
     });
 }
 
@@ -179,7 +183,7 @@ pub async fn propagate_to_replicas(
     command: &[String],
     replicas: &Replicas,
     master_repl_offset: &mut usize,
-) {
+) -> Result<()> {
     let command_to_propagate = RespValue::Array(
         command
             .iter()
@@ -191,8 +195,10 @@ pub async fn propagate_to_replicas(
 
     let mut replicas = replicas.lock().await;
     for (replica_writer, _replica_reader) in replicas.iter_mut() {
-        let _ = replica_writer
+        replica_writer
             .write_all(encode(command_to_propagate.clone()).as_bytes())
-            .await;
+            .await?;
     }
+
+    Ok(())
 }

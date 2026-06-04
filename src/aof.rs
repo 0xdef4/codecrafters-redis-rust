@@ -4,11 +4,13 @@ use std::sync::Arc;
 
 use tokio::sync::Notify;
 
+use anyhow::Result;
+
 use crate::commands::dispatch_command_inner;
 use crate::protocol::{RespValue, decode_arrays, encode};
 use crate::{Config, Db};
 
-pub fn init_aof_if_enabled(config: &Config) {
+pub fn init_aof_if_enabled(config: &Config) -> Result<()> {
     // if appendonly is set to yes
     if config.appendonly == "yes" {
         // Create append-only directory
@@ -16,12 +18,12 @@ pub fn init_aof_if_enabled(config: &Config) {
             (&config.dir, &config.appenddirname, &config.appendfilename);
 
         let path = dir.join(appenddirname);
-        let _ = fs::create_dir_all(&path);
+        fs::create_dir_all(&path)?;
 
         // Create the Append-Only File
         let aof_filename = format!("{}.1.incr.aof", appendfilename);
         if !path.join(&aof_filename).exists() {
-            let _ = fs::File::create(&path.join(&aof_filename));
+            fs::File::create(&path.join(&aof_filename))?;
         }
 
         // Create the manifest File
@@ -29,12 +31,14 @@ pub fn init_aof_if_enabled(config: &Config) {
         if !path.join(&manifest_filename).exists() {
             let mut f = fs::File::create(&path.join(manifest_filename)).unwrap();
             // and write
-            let _ = f.write_all(format!("file {} seq 1 type i", &aof_filename).as_bytes());
+            f.write_all(format!("file {} seq 1 type i", &aof_filename).as_bytes())?;
         }
     }
+
+    Ok(())
 }
 
-pub fn append_to_aof(command: &[String], config: &Arc<Config>) {
+pub fn append_to_aof(command: &[String], config: &Arc<Config>) -> Result<()> {
     let command_to_append_in_resp_format: String = encode(RespValue::Array(
         command
             .iter()
@@ -48,7 +52,7 @@ pub fn append_to_aof(command: &[String], config: &Arc<Config>) {
     let path = dir.join(appenddirname);
     let manifest_filename = format!("{}.manifest", appendfilename);
 
-    let mut f = fs::File::open(&path.join(manifest_filename)).unwrap();
+    let mut f = fs::File::open(&path.join(manifest_filename))?;
     let mut buf = [0u8; 512];
 
     match f.read(&mut buf) {
@@ -61,19 +65,20 @@ pub fn append_to_aof(command: &[String], config: &Arc<Config>) {
             // write to AOF file
             let mut f = fs::OpenOptions::new()
                 .append(true)
-                .open(&path.join(aof_filename))
-                .unwrap();
-            let _ = f.write_all(command_to_append_in_resp_format.as_bytes());
+                .open(&path.join(aof_filename))?;
+            f.write_all(command_to_append_in_resp_format.as_bytes())?;
 
             if config.appendfsync == "always" {
-                let _ = f.flush(); // BufWriter 버퍼 → OS 버퍼
-                let _ = f.sync_all(); // OS 버퍼 → 실제 디스크
+                f.flush()?; // BufWriter 버퍼 → OS 버퍼
+                f.sync_all()?; // OS 버퍼 → 실제 디스크
             }
         }
         _ => {
             unimplemented!()
         }
     }
+
+    Ok(())
 }
 
 pub fn replay_commands(config: &Arc<Config>, db: &Db, notify: &Arc<Notify>) {

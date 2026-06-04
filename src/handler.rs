@@ -6,6 +6,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::sync::Notify;
 
+use anyhow::Result;
+
 use crate::Config;
 use crate::aof::append_to_aof;
 use crate::commands::{dispatch_command, execute_psync, execute_subscribe, execute_wait};
@@ -47,7 +49,7 @@ pub async fn handle_stream(
     config: Arc<Config>,
     pubsub: Pubsub,
     acl_db: AclDb,
-) {
+) -> Result<()> {
     let client_id = CLIENT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 
     let mut client_state = ClientState::new({
@@ -83,23 +85,21 @@ pub async fn handle_stream(
                         && cmd_upper != "WATCH"
                     {
                         let _ = &mut client_state.command_queue.push(command.clone());
-                        let _ = wr
-                            .write_all(
-                                encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes(),
-                            )
-                            .await;
+                        wr.write_all(
+                            encode(RespValue::SimpleString("QUEUED".to_string())).as_bytes(),
+                        )
+                        .await?;
                         continue;
                     }
 
                     if !client_state.is_authenticated && cmd_upper != "AUTH" {
-                        let _ = wr
-                            .write_all(
-                                encode(RespValue::SimpleError(
-                                    "NOAUTH Authentication required.".to_string(),
-                                ))
-                                .as_bytes(),
-                            )
-                            .await;
+                        wr.write_all(
+                            encode(RespValue::SimpleError(
+                                "NOAUTH Authentication required.".to_string(),
+                            ))
+                            .as_bytes(),
+                        )
+                        .await?;
                         continue;
                     }
 
@@ -107,7 +107,9 @@ pub async fn handle_stream(
                         && is_write_command(&command)
                         && !matches!(cmd_upper.as_str(), "XADD" | "GEOADD")
                     {
-                        append_to_aof(&command, &config);
+                        if let Err(e) = append_to_aof(&command, &config) {
+                            eprintln!("error appending to aof: {}", e);
+                        }
                     }
 
                     match cmd_upper.as_str() {
@@ -123,17 +125,24 @@ pub async fn handle_stream(
                             .await;
                         }
                         "PSYNC" => {
-                            execute_psync(command.as_slice(), wr, rd, &replicas).await;
-                            return;
+                            if let Err(e) =
+                                execute_psync(command.as_slice(), wr, rd, &replicas).await
+                            {
+                                eprint!("error executing psync command: {}", e)
+                            }
+                            return Ok(());
                         }
                         "WAIT" => {
-                            execute_wait(
+                            if let Err(e) = execute_wait(
                                 command.as_slice(),
                                 &mut wr,
                                 &replicas,
                                 client_state.master_repl_offset,
                             )
-                            .await;
+                            .await
+                            {
+                                eprint!("error executing psync command: {}", e)
+                            }
                         }
                         _ => {
                             let resp = dispatch_command(
@@ -150,27 +159,32 @@ pub async fn handle_stream(
 
                             match resp {
                                 Some(resp) => {
-                                    let _ = wr.write_all(encode(resp).as_bytes()).await;
+                                    wr.write_all(encode(resp).as_bytes()).await?;
                                 }
                                 None => {
-                                    let _ =
-                                        wr.write_all(encode(RespValue::ArrayNull).as_bytes()).await;
-                                    return;
+                                    wr.write_all(encode(RespValue::ArrayNull).as_bytes())
+                                        .await?;
+                                    return Ok(());
                                 }
                             }
                         }
                     }
                     if role == "master" && is_write_command(&command) {
-                        propagate_to_replicas(
+                        if let Err(e) = propagate_to_replicas(
                             &command,
                             &replicas,
                             &mut client_state.master_repl_offset,
                         )
-                        .await;
+                        .await
+                        {
+                            eprintln!("error propagating to replicas: {}", e);
+                        }
                     }
                 }
             }
             Err(_) => break,
         }
     }
+
+    Ok(())
 }
